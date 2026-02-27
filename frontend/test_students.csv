@@ -1,0 +1,6 @@
+id,name,email,class_name,semester,attendance,marks,has_financial_issue,has_family_issue
+STU-3001,Aarav Sharma,aarav@edu.com,CS-A,Semester 4,45,30,true,false
+STU-3002,Diya Patel,diya@edu.com,CS-B,Semester 3,52,38,false,true
+STU-3003,Rohan Gupta,rohan@edu.com,EC-A,Semester 5,68,55,false,false
+STU-3004,Meera Joshi,meera@edu.com,ME-A,Semester 2,40,25,true,true
+STU-3005,Karan Singh,karan@edu.com,CE-A,Semester 6,72,60,false,false

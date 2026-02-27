@@ -1,0 +1,16 @@
+Student_ID,Week_Number,Attendance_Percentage,IA_Marks,Semester_Marks,Backlog_Count,Fee_Outstanding
+STU-3001,1,90,,,, No
+STU-3001,2,85,,,,No
+STU-3001,3,80,18,,,No
+STU-3001,4,70,,,,Yes
+STU-3001,5,60,,,1,Yes
+STU-3002,1,92,,,,No
+STU-3002,2,91,,,,No
+STU-3002,3,90,24,,,No
+STU-3002,4,89,,,,No
+STU-3002,5,91,23,,,No
+STU-3003,1,75,,,,No
+STU-3003,2,68,,,,No
+STU-3003,3,60,15,,,No
+STU-3003,4,55,,,1,Yes
+STU-3003,5,50,,,2,Yes

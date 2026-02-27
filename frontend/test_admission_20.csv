@@ -1,0 +1,21 @@
+id,name,class_name,semester,Family_Income,Scholarship,Education_Loan,Father_Occupation,Mother_Occupation,Parent_Education,Home_Location,HighSchool_Grade,Admission_Quota
+STU-2001,Aarav Sharma,CS-A,Semester 1,12000,No,Yes,Daily Wage Worker,Homemaker,HighSchool,Rural,65,Management
+STU-2002,Priya Iyer,CS-B,Semester 2,25000,Yes,No,Teacher,Teacher,Graduate,Urban,82,Merit
+STU-2003,Rahul Kumar,AI-ML-A,Semester 3,8000,Yes,Yes,Farmer,Homemaker,Primary School,Rural,58,SC/ST
+STU-2004,Sneha Reddy,AI-ML-B,Semester 4,35000,No,No,Engineer,Nurse,Graduate,Urban,88,Merit
+STU-2005,Vikram Singh,CS-A,Semester 5,5000,Yes,Yes,Driver,Homemaker,HighSchool,Rural,55,OBC
+STU-2006,Ananya Das,CS-B,Semester 1,18000,No,No,Shopkeeper,Teacher,Diploma,Semi-Urban,74,Management
+STU-2007,Karthik Raj,AI-ML-A,Semester 2,75000,No,No,Government Job,Government Job,Postgraduate,Urban,91,Merit
+STU-2008,Meera Nair,AI-ML-B,Semester 3,15000,Yes,No,Factory Worker,Homemaker,HighSchool,Semi-Urban,69,OBC
+STU-2009,Arjun Patel,CS-A,Semester 4,60000,No,No,Small Business,Shopkeeper,Graduate,Urban,85,Management
+STU-2010,Divya Menon,CS-B,Semester 5,10000,Yes,Yes,Farmer,Homemaker,Primary School,Rural,61,SC/ST
+STU-2011,Rohit Verma,AI-ML-A,Semester 1,22000,No,No,Factory Worker,Homemaker,HighSchool,Semi-Urban,72,Merit
+STU-2012,Pooja Sharma,AI-ML-B,Semester 2,9000,Yes,Yes,Daily Wage Worker,Homemaker,Primary School,Rural,59,OBC
+STU-2013,Nikhil Gupta,CS-A,Semester 3,45000,No,No,Engineer,Teacher,Graduate,Urban,87,Management
+STU-2014,Kavya Nair,CS-B,Semester 4,30000,Yes,No,Teacher,Nurse,Graduate,Semi-Urban,78,Merit
+STU-2015,Aditya Rao,AI-ML-A,Semester 5,7000,Yes,Yes,Driver,Homemaker,HighSchool,Rural,62,SC/ST
+STU-2016,Neha Patel,AI-ML-B,Semester 1,55000,No,No,Government Job,Government Job,Postgraduate,Urban,90,Merit
+STU-2017,Siddharth Jain,CS-A,Semester 2,20000,No,Yes,Shopkeeper,Homemaker,Diploma,Semi-Urban,73,Management
+STU-2018,Ishita Roy,CS-B,Semester 3,14000,Yes,No,Factory Worker,Teacher,HighSchool,Rural,68,OBC
+STU-2019,Varun Kapoor,AI-ML-A,Semester 4,80000,No,No,Doctor,Nurse,Postgraduate,Urban,93,Merit
+STU-2020,Aditi Mishra,AI-ML-B,Semester 5,11000,Yes,Yes,Farmer,Homemaker,Primary School,Rural,60,SC/ST

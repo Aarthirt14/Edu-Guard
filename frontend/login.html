@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduGuard AI — Sign In</title>
+    <meta name="description" content="Sign in to EduGuard AI Student Dropout Prediction and Counseling System" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        /* ===== Login Page Styles ===== */
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-page::before {
+            content: '';
+            position: absolute;
+            top: -30%;
+            left: -20%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .login-page::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            position: relative;
+            z-index: 2;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 40px;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 80px rgba(37, 99, 235, 0.05);
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-logo .logo-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 0 30px rgba(37, 99, 235, 0.3);
+        }
+
+        .login-logo h1 {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .login-logo h1 span {
+            color: var(--accent-secondary);
+        }
+
+        .login-logo p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        /* Role Selector */
+        .role-selector {
+            margin-bottom: 28px;
+        }
+
+        .role-selector label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .role-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .role-card:hover {
+            border-color: rgba(37, 99, 235, 0.3);
+            background: rgba(37, 99, 235, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .role-card.selected {
+            border-color: var(--accent-primary);
+            background: rgba(37, 99, 235, 0.1);
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.15), inset 0 0 20px rgba(37, 99, 235, 0.05);
+        }
+
+        .role-card.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            font-size: 11px;
+            color: var(--accent-secondary);
+            font-weight: 700;
+            background: rgba(37, 99, 235, 0.2);
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .role-card .role-icon {
+            font-size: 22px;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            transition: color 0.3s;
+        }
+
+        .role-card.selected .role-icon {
+            color: var(--accent-secondary);
+        }
+
+        .role-card .role-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: color 0.3s;
+        }
+
+        .role-card.selected .role-name {
+            color: var(--text-primary);
+        }
+
+        /* Login Form */
+        .login-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .login-form .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .login-form .input-wrapper {
+            position: relative;
+        }
+
+        .login-form .input-wrapper .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .login-form .input-wrapper input {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px 12px 42px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .login-form .input-wrapper input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        .login-form .input-wrapper input:focus+.input-icon,
+        .login-form .input-wrapper input:focus~.input-icon {
+            color: var(--accent-primary);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            transition: color 0.3s;
+        }
+
+        .password-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        /* Login Button */
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent-primary);
+            color: #fff;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-btn:hover:not(:disabled) {
+            background: #1D4ED8;
+            box-shadow: 0 0 30px rgba(37, 99, 235, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .login-btn.loading {
+            pointer-events: none;
+        }
+
+        .login-btn .spinner {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        .login-btn.loading .spinner {
+            display: block;
+        }
+
+        .login-btn.loading .btn-text {
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Error Message */
+        .login-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            color: #EF4444;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .login-error.visible {
+            display: flex;
+            animation: shakeError 0.5s ease;
+        }
+
+        @keyframes shakeError {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            15%,
+            45%,
+            75% {
+                transform: translateX(-6px);
+            }
+
+            30%,
+            60%,
+            90% {
+                transform: translateX(6px);
+            }
+        }
+
+        /* Demo Credentials */
+        .demo-credentials {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .demo-credentials h4 {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .demo-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .demo-item:hover {
+            border-color: var(--accent-primary);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .demo-item .demo-role {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent-secondary);
+            margin-bottom: 2px;
+        }
+
+        .demo-item .demo-email {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 28px 20px;
+            }
+
+            .role-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-page">
+        <div class="login-container">
+            <div class="login-card">
+
+                <!-- Logo -->
+                <div class="login-logo">
+                    <div class="logo-icon">🛡️</div>
+                    <h1>Edu<span>Guard</span> AI</h1>
+                    <p>Sign in to continue</p>
+                </div>
+
+                <!-- Role Selector -->
+                <div class="role-selector">
+                    <label>Select Your Role</label>
+                    <div class="role-grid">
+                        <div class="role-card" data-role="admin" onclick="selectRole('admin', this)">
+                            <div class="role-icon"><i class="fas fa-user-shield"></i></div>
+                            <div class="role-name">Admin</div>
+                        </div>
+                        <div class="role-card" data-role="faculty" onclick="selectRole('faculty', this)">
+                            <div class="role-icon"><i class="fas fa-chalkboard-teacher"></i></div>
+                            <div class="role-name">Faculty</div>
+                        </div>
+                        <div class="role-card" data-role="counselor" onclick="selectRole('counselor', this)">
+                            <div class="role-icon"><i class="fas fa-user-md"></i></div>
+                            <div class="role-name">Counselor</div>
+                        </div>
+                        <div class="role-card" data-role="student" onclick="selectRole('student', this)">
+                            <div class="role-icon"><i class="fas fa-user-graduate"></i></div>
+                            <div class="role-name">Student</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div class="login-error" id="loginError">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="loginErrorText">Invalid credentials. Please try again.</span>
+                </div>
+
+                <!-- Login Form -->
+                <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="loginEmail">Email or User ID</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="loginEmail" placeholder="Enter your email or user ID" required
+                                autocomplete="username" />
+                            <i class="fas fa-envelope input-icon"></i>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="loginPassword" placeholder="Enter your password" required
+                                autocomplete="current-password" />
+                            <i class="fas fa-lock input-icon"></i>
+                            <button type="button" class="password-toggle" onclick="togglePassword()"
+                                title="Show/Hide Password">
+                                <i class="fas fa-eye" id="passwordToggleIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="loginBtn" disabled>
+                        <span class="spinner"></span>
+                        <span class="btn-text"><i class="fas fa-sign-in-alt"></i> Sign In</span>
+                    </button>
+                </form>
+
+                <!-- Demo Credentials -->
+                <div class="demo-credentials">
+                    <h4>Quick Login (Demo)</h4>
+                    <div class="demo-grid">
+                        <div class="demo-item" onclick="fillDemo('admin')">
+                            <div class="demo-role">Admin</div>
+                            <div class="demo-email">admin@eduguard.com</div>
+                        </div>
+                        <div class="demo-item" onclick="fillDemo('faculty')">
+                            <div class="demo-role">Faculty</div>
+                            <div class="demo-email">faculty@eduguard.com</div>
+                        </div>
+                        <div class="demo-item" onclick="fillDemo('counselor')">
+                            <div class="demo-role">Counselor</div>
+                            <div class="demo-email">counselor@eduguard.com</div>
+                        </div>
+                        <div class="demo-item" onclick="fillDemo('student')">
+                            <div class="demo-role">Student</div>
+                            <div class="demo-email">student@eduguard.com</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js?v=2"></script>
+
+</body>
+
+</html>
