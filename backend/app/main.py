@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.db.database import engine, Base, SessionLocal
+from app.db.database import engine, Base, SessionLocal, sync_sqlite_schema
 from app.api.router import api_router
 
 logging.basicConfig(
@@ -31,7 +31,9 @@ async def lifespan(app: FastAPI):
     import app.models.settings
     import app.models.financial_support
     import app.models.counseling_session
+    import app.models.copilot
     Base.metadata.create_all(bind=engine)
+    sync_sqlite_schema(Base)
     logger.info("✅ Database tables ready")
 
     # Seed initial data

@@ -1131,30 +1131,36 @@ th .sort-icon {
 }
 
 #page-analytics .analytics-charts-grid {
-  gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 #page-analytics .analytics-chart-card {
-  padding: 12px;
-  min-height: 180px;
+  padding: 8px;
+  min-height: 120px !important;
+  height: 120px !important;
+  max-height: 120px !important;
+  overflow: hidden;
 }
 
 #page-analytics .analytics-chart-card .chart-header {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 #page-analytics .analytics-chart-card .chart-header h3 {
-  font-size: 13px;
+  font-size: 11px;
 }
 
 #page-analytics .analytics-chart-canvas {
-  height: 140px;
+  height: 84px !important;
+  max-height: 84px !important;
 }
 
 #page-analytics .analytics-top-card {
-  min-height: 150px;
-  padding: 10px;
+  min-height: 112px;
+  padding: 7px;
+  height: 112px !important;
+  max-height: 112px !important;
 }
 
 #page-analytics .analytics-top-card .chart-header {
@@ -1162,11 +1168,12 @@ th .sort-icon {
 }
 
 #page-analytics .analytics-top-canvas {
-  height: 110px;
+  height: 76px !important;
+  max-height: 76px !important;
 }
 
 #page-analytics > .analytics-chart-card {
-  max-width: 760px;
+  max-width: 640px;
   margin-left: 0;
 }
 

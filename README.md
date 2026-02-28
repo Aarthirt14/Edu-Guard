@@ -148,7 +148,56 @@ DATABASE_URL=sqlite:///./eduguard.db
 ANTHROPIC_API_KEY=sk-ant-...          # Optional — enables real AI chat
 ALLOWED_ORIGINS=http://localhost:5500
 HIGH_RISK_THRESHOLD=70
+
+# Agent Copilot Integrations
+MONGODB_URL=mongodb://localhost:27017
+N8N_WEBHOOK_URL=https://<your-n8n-domain>/webhook/eduguard-risk-intake
+N8N_API_KEY=<optional-shared-secret>
 ```
+
+---
+
+## 🔗 n8n Automation Integration (Agent Copilot)
+
+The Admin **Agent Copilot** page calls backend endpoint `POST /api/copilot/runs`.
+During each run, backend sends each high-risk action ticket to your n8n webhook.
+
+### Webhook payload from EduGuard
+
+```json
+{
+    "student_id": "STU-2005",
+    "student_name": "Anita Das",
+    "class_name": "CS-A",
+    "risk_score": 88.4,
+    "risk_level": "high",
+    "priority": "Critical",
+    "reason_summary": "Attendance dropped from 78% to 54%. IA marks declined from 52 to 38.",
+    "recommended_intervention": "Counseling",
+    "risk_trend": "declining",
+    "factors": ["attendance", "academic"],
+    "source": "eduguard-copilot"
+}
+```
+
+### n8n setup checklist
+
+1. Import workflow: `EduGuard Student Risk Intervention and Escalation Automation.json`.
+2. Set Webhook path to `eduguard-risk-intake` and activate workflow.
+3. Replace placeholders:
+     - Slack channel id
+     - counselor/faculty email receivers
+     - Google Sheets document/sheet
+4. Configure OpenAI credentials in n8n AI nodes.
+5. Copy Production Webhook URL and set it in `N8N_WEBHOOK_URL`.
+6. Optional security: validate `X-API-KEY` or `Authorization: Bearer <token>` header in n8n; store same token in `N8N_API_KEY`.
+
+### Status mapping in EduGuard
+
+- `n8n_status=triggered` → webhook delivered successfully.
+- `n8n_status=failed_<code>` → webhook returned non-2xx.
+- `n8n_status=failed_exception` → network/timeout/runtime error.
+- `n8n_status=not_configured` → `N8N_WEBHOOK_URL` is empty.
 
 ---
 

@@ -16,6 +16,9 @@ let selectedCounselingStudentId = null;
 let studentFinancialCase = null;
 let studentAttendanceChart = null;
 let studentMarksChart = null;
+let copilotRuns = [];
+let copilotTickets = [];
+let selectedCopilotRunId = null;
 
 function getAuthHeaders(extra = {}) {
   const user = getCurrentUser();
@@ -642,6 +645,173 @@ async function submitStudentFinancialInput() {
     alert('Financial support details submitted successfully.');
   } catch (e) {
     alert('Failed to submit details. Please contact admin if this persists.');
+  }
+}
+
+async function loadCopilotRuns() {
+  const user = getCurrentUser();
+  if (!user || user.role !== "admin") return;
+
+  try {
+    const rows = await fetchAPI('/api/copilot/runs?limit=20');
+    copilotRuns = Array.isArray(rows) ? rows : [];
+    renderCopilotRunsTable();
+
+    if (copilotRuns.length) {
+      await openCopilotRun(copilotRuns[0].id, false);
+    } else {
+      copilotTickets = [];
+      renderCopilotTicketsTable();
+    }
+  } catch (e) {
+    copilotRuns = [];
+    copilotTickets = [];
+    renderCopilotRunsTable();
+    renderCopilotTicketsTable();
+  }
+}
+
+function renderCopilotRunsTable() {
+  const tbody = document.getElementById("copilotRunsTableBody");
+  const runsEl = document.getElementById("copilotStatRuns");
+  const lastRunEl = document.getElementById("copilotStatLastRun");
+  const actionsEl = document.getElementById("copilotStatActions");
+  const criticalEl = document.getElementById("copilotStatCritical");
+
+  if (runsEl) runsEl.textContent = copilotRuns.length;
+  if (actionsEl) actionsEl.textContent = copilotRuns.reduce((acc, run) => acc + Number(run.actions_created || 0), 0);
+  if (criticalEl) {
+    const critical = copilotTickets.filter(t => String(t.priority || "").toLowerCase() === "critical").length;
+    criticalEl.textContent = critical;
+  }
+  if (lastRunEl) {
+    lastRunEl.textContent = copilotRuns[0]?.created_at
+      ? new Date(copilotRuns[0].created_at).toLocaleDateString()
+      : "—";
+  }
+
+  if (!tbody) return;
+
+  if (!copilotRuns.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:16px;">No Copilot runs yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = copilotRuns.map(run => {
+    const createdAt = run.created_at ? new Date(run.created_at).toLocaleString() : "—";
+    const status = String(run.status || "completed").toLowerCase();
+    const badge = status === "completed" ? "completed" : status === "running" ? "active" : "pending";
+    const isSelected = Number(selectedCopilotRunId) === Number(run.id);
+    return `
+      <tr style="${isSelected ? 'background:rgba(37,99,235,0.10);' : ''}">
+        <td>#${run.id}</td>
+        <td>${escapeHtml(run.run_type || "weekly")}</td>
+        <td>${run.total_students_scanned || 0}</td>
+        <td>${run.high_risk_identified || 0}</td>
+        <td>${run.actions_created || 0}</td>
+        <td><span class="badge badge-${badge}">${escapeHtml(run.status || "completed")}</span></td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="openCopilotRun(${run.id}, true)"><i class="fas fa-eye"></i> View</button>
+          <span class="text-muted" style="margin-left:8px;font-size:12px;">${createdAt}</span>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function renderCopilotTicketsTable() {
+  const tbody = document.getElementById("copilotTicketsTableBody");
+  const criticalEl = document.getElementById("copilotStatCritical");
+  if (!tbody) return;
+
+  if (!copilotTickets.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:16px;">No action tickets yet.</td></tr>';
+    if (criticalEl) criticalEl.textContent = "0";
+    return;
+  }
+
+  const critical = copilotTickets.filter(t => String(t.priority || "").toLowerCase() === "critical").length;
+  if (criticalEl) criticalEl.textContent = critical;
+
+  tbody.innerHTML = copilotTickets.map(t => {
+    const risk = Number(t.risk_score || 0);
+    const priorityCls = String(t.priority || "").toLowerCase() === "critical"
+      ? "danger"
+      : String(t.priority || "").toLowerCase() === "high" ? "pending" : "active";
+    const cleanReason = String(t.reason_summary || "—").replace(/\s*\[RAG:[\s\S]*?\]\s*$/i, "").trim() || "—";
+    return `
+      <tr>
+        <td>${escapeHtml(t.student_name || t.student_id || "—")}</td>
+        <td><span class="text-muted">${escapeHtml(t.student_id || "—")}</span></td>
+        <td>${escapeHtml(t.class_name || "—")}</td>
+        <td>${risk.toFixed(1)}</td>
+        <td><span class="badge badge-${priorityCls}">${escapeHtml(t.priority || "Medium")}</span></td>
+        <td>${escapeHtml(t.recommended_intervention || "—")}</td>
+        <td style="max-width:320px;">${escapeHtml(cleanReason)}</td>
+        <td>${escapeHtml(t.status || "Open")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function openCopilotRun(runId, notify = false) {
+  try {
+    selectedCopilotRunId = Number(runId);
+    const detail = await fetchAPI(`/api/copilot/runs/${runId}`);
+    copilotTickets = Array.isArray(detail?.tickets) ? detail.tickets : [];
+    renderCopilotRunsTable();
+    renderCopilotTicketsTable();
+
+    const lastRunEl = document.getElementById("copilotStatLastRun");
+    if (lastRunEl && detail?.run?.created_at) {
+      lastRunEl.textContent = new Date(detail.run.created_at).toLocaleDateString();
+    }
+
+    const ticketsTitleEl = document.getElementById("copilotTicketsTitle");
+    if (ticketsTitleEl) {
+      const createdAt = detail?.run?.created_at
+        ? new Date(detail.run.created_at).toLocaleString()
+        : "—";
+      ticketsTitleEl.textContent = `Action Tickets — Run #${runId} (${createdAt})`;
+    }
+
+    if (notify) {
+      document.getElementById("copilotTicketsTableBody")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  } catch (e) {
+    selectedCopilotRunId = null;
+    copilotTickets = [];
+    renderCopilotRunsTable();
+    renderCopilotTicketsTable();
+    const ticketsTitleEl = document.getElementById("copilotTicketsTitle");
+    if (ticketsTitleEl) ticketsTitleEl.textContent = "Action Tickets";
+    alert(`Failed to load Copilot run #${runId}. Please refresh and try again.`);
+  }
+}
+
+async function runWeeklyCopilot() {
+  const btn = document.getElementById("runCopilotBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Running...';
+  }
+
+  try {
+    const run = await fetchAPI('/api/copilot/runs', {
+      method: 'POST',
+      body: JSON.stringify({ run_type: 'weekly' }),
+    });
+
+    await loadCopilotRuns();
+    await openCopilotRun(run.id, false);
+    alert(`Copilot run #${run.id} completed. Action tickets generated: ${run.actions_created}.`);
+  } catch (e) {
+    alert("Copilot run failed. Please check backend logs.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-play"></i> Run Weekly Copilot';
+    }
   }
 }
 
@@ -1560,7 +1730,7 @@ async function openRiskTrendModal(studentId, studentName) {
 // ===== ROLE-BASED ACCESS CONTROL =====
 
 const roleAccess = {
-  admin: ["dashboard", "upload-data", "high-risk", "interventions", "analytics", "user-management", "settings"],
+  admin: ["dashboard", "upload-data", "high-risk", "interventions", "analytics", "agent-copilot", "user-management", "settings"],
   faculty: ["faculty", "upload-data", "high-risk"],
   counselor: ["counselor", "counseling-management", "interventions", "high-risk"],
   student: ["student"]
@@ -1678,6 +1848,12 @@ function showPage(page) {
     })();
   }
 
+  if (user && user.role === 'admin' && page === 'agent-copilot') {
+    (async () => {
+      await loadCopilotRuns();
+    })();
+  }
+
   if (user && user.role === 'admin' && page === 'dashboard') {
     (async () => {
       await loadFinancialCases();
@@ -1777,6 +1953,17 @@ document.getElementById("sidebarClose")?.addEventListener("click", () => {
 // ===== CHARTS =====
 
 function initCharts() {
+  const compactYAxis = {
+    ticks: {
+      color: "#6B7280",
+      font: { family: "Inter", size: 9 },
+      padding: 1,
+      maxTicksLimit: 10,
+      autoSkip: false,
+    },
+    grid: { color: "rgba(255,255,255,0.04)" },
+  };
+
   const chartDefaults = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1805,10 +1992,7 @@ function initCharts() {
         ticks: { color: "#6B7280", font: { family: "Inter", size: 11 } },
         grid: { color: "rgba(255,255,255,0.04)" },
       },
-      y: {
-        ticks: { color: "#6B7280", font: { family: "Inter", size: 11 } },
-        grid: { color: "rgba(255,255,255,0.04)" },
-      },
+      y: compactYAxis,
     },
   };
 
@@ -1867,6 +2051,8 @@ function initCharts() {
   // Analytics: Risk Trend Over Time
   const rtCtx = document.getElementById("riskTrendChart");
   if (rtCtx) {
+    rtCtx.style.height = "76px";
+    rtCtx.style.maxHeight = "76px";
     const trendLabels = analyticsData?.risk_trend?.map(p => p.month) || [];
     const trendCounts = analyticsData?.risk_trend?.map(p => p.count) || [];
     new Chart(rtCtx.getContext("2d"), {
@@ -1886,13 +2072,45 @@ function initCharts() {
           borderWidth: 2.5,
         }]
       },
-      options: { ...chartDefaults },
+      options: {
+        ...chartDefaults,
+        plugins: {
+          ...chartDefaults.plugins,
+          legend: { display: false },
+        },
+        layout: {
+          padding: {
+            left: 0,
+            right: 4,
+            top: 0,
+            bottom: 0,
+          },
+        },
+        scales: {
+          ...chartDefaults.scales,
+          x: {
+            ...chartDefaults.scales.x,
+            offset: false,
+          },
+          y: {
+            ...chartDefaults.scales.y,
+            ticks: {
+              ...chartDefaults.scales.y.ticks,
+              padding: 1,
+              maxTicksLimit: 10,
+              autoSkip: false,
+            },
+          },
+        },
+      },
     });
   }
 
   // Analytics: Intervention Success
   const isCtx = document.getElementById("interventionChart");
   if (isCtx) {
+    isCtx.style.height = "76px";
+    isCtx.style.maxHeight = "76px";
     const interventionSuccess = analyticsData?.intervention_success || {
       improved: 0,
       stable: 0,
@@ -1923,8 +2141,7 @@ function initCharts() {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
-        aspectRatio: 2.6,
+        maintainAspectRatio: false,
         plugins: {
           legend: {
             position: "right",
@@ -1945,6 +2162,8 @@ function initCharts() {
   // Analytics: Risk Factor Distribution
   const rfCtx = document.getElementById("factorChart");
   if (rfCtx) {
+    rfCtx.style.height = "84px";
+    rfCtx.style.maxHeight = "84px";
     const factorDistribution = analyticsData?.factor_distribution || {
       financial: 0,
       attendance: 0,
@@ -1977,14 +2196,43 @@ function initCharts() {
           ],
           borderWidth: 1,
           borderRadius: 8,
-          barThickness: 50,
+          barThickness: 28,
         }]
       },
       options: {
         ...chartDefaults,
+        layout: {
+          padding: {
+            left: 0,
+            right: 4,
+            top: 0,
+            bottom: 0,
+          },
+        },
         plugins: {
           ...chartDefaults.plugins,
           legend: { display: false },
+        },
+        scales: {
+          ...chartDefaults.scales,
+          x: {
+            ...chartDefaults.scales.x,
+            offset: false,
+            ticks: {
+              ...chartDefaults.scales.x.ticks,
+              padding: 2,
+            },
+          },
+          y: {
+            ...chartDefaults.scales.y,
+            beginAtZero: true,
+            ticks: {
+              ...chartDefaults.scales.y.ticks,
+              padding: 1,
+              maxTicksLimit: 10,
+              autoSkip: false,
+            },
+          },
         },
       },
     });

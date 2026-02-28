@@ -51,6 +51,9 @@
         <div class="nav-item" data-page="analytics" onclick="showPage('analytics')">
           <span class="nav-icon"><i class="fas fa-chart-line"></i></span> Analytics & Reports
         </div>
+        <div class="nav-item" data-page="agent-copilot" onclick="showPage('agent-copilot')">
+          <span class="nav-icon"><i class="fas fa-robot"></i></span> Agent Copilot
+        </div>
         <div class="nav-item" data-page="user-management" onclick="showPage('user-management')">
           <span class="nav-icon"><i class="fas fa-user-cog"></i></span> User Management
         </div>
@@ -751,6 +754,103 @@
       </section>
 
       <!-- ============================================================ -->
+      <!-- PAGE: AGENT COPILOT                                          -->
+      <!-- ============================================================ -->
+      <section class="page-content page-section" id="page-agent-copilot">
+        <div class="page-header">
+          <h2>Early Warning + Action Copilot</h2>
+          <p>Weekly agent orchestration for risk detection, reasoning, and intervention planning</p>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:16px;">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-history"></i></div>
+            <div class="stat-label">Total Runs</div>
+            <div class="stat-value" id="copilotStatRuns">0</div>
+            <div class="stat-glow blue"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon cyan"><i class="fas fa-calendar-week"></i></div>
+            <div class="stat-label">Last Run</div>
+            <div class="stat-value" id="copilotStatLastRun">—</div>
+            <div class="stat-glow cyan"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-tasks"></i></div>
+            <div class="stat-label">Actions Created</div>
+            <div class="stat-value" id="copilotStatActions">0</div>
+            <div class="stat-glow blue"></div>
+          </div>
+          <div class="stat-card danger">
+            <div class="stat-icon red"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="stat-label">Critical Tickets</div>
+            <div class="stat-value danger-text" id="copilotStatCritical">0</div>
+            <div class="stat-glow red"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header">
+            <h3>Run Weekly Agent</h3>
+            <button class="btn btn-primary" id="runCopilotBtn" onclick="runWeeklyCopilot()"><i class="fas fa-play"></i> Run Weekly Copilot</button>
+          </div>
+          <div class="card-body">
+            <p class="text-muted" style="margin:0;">Pipeline: fetch_student_data → predict_risk → explain_factors → choose_intervention → create_action_tickets</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-header">
+            <h3>Recent Copilot Runs</h3>
+            <button class="btn btn-outline btn-sm" onclick="loadCopilotRuns()"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Run ID</th>
+                  <th>Type</th>
+                  <th>Scanned</th>
+                  <th>High Risk</th>
+                  <th>Actions</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="copilotRunsTableBody">
+                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:16px;">No Copilot runs yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 id="copilotTicketsTitle">Action Tickets</h3>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>ID</th>
+                  <th>Class</th>
+                  <th>Risk</th>
+                  <th>Priority</th>
+                  <th>Recommendation</th>
+                  <th>Why Flagged</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="copilotTicketsTableBody">
+                <tr><td colspan="8" class="text-muted" style="text-align:center;padding:16px;">No action tickets yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
       <!-- PAGE: UPLOAD DATA (Admin + Faculty)                          -->
       <!-- ============================================================ -->
       <section class="page-content page-section" id="page-upload-data">
@@ -1418,7 +1518,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="auth.js?v=14"></script>
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 
 </body>
 
