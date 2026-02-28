@@ -39,6 +39,9 @@
         <div class="nav-item" data-page="counselor" onclick="showPage('counselor')">
           <span class="nav-icon"><i class="fas fa-user-md"></i></span> Counseling
         </div>
+        <div class="nav-item" data-page="counseling-management" onclick="showPage('counseling-management')">
+          <span class="nav-icon"><i class="fas fa-calendar-check"></i></span> Counseling Management
+        </div>
         <div class="nav-item" data-page="faculty" onclick="showPage('faculty')">
           <span class="nav-icon"><i class="fas fa-chalkboard-teacher"></i></span> Faculty
         </div>
@@ -322,25 +325,25 @@
           <div class="stat-card danger">
             <div class="stat-icon red"><i class="fas fa-user-clock"></i></div>
             <div class="stat-label">Requiring Counseling</div>
-            <div class="stat-value danger-text">12</div>
+            <div class="stat-value danger-text" id="counselorStatRequiring">...</div>
             <div class="stat-glow red"></div>
           </div>
           <div class="stat-card">
             <div class="stat-icon blue"><i class="fas fa-comments"></i></div>
             <div class="stat-label">Active Sessions</div>
-            <div class="stat-value">7</div>
+            <div class="stat-value" id="counselorStatActiveSessions">...</div>
             <div class="stat-glow blue"></div>
           </div>
           <div class="stat-card danger">
             <div class="stat-icon red"><i class="fas fa-exclamation-circle"></i></div>
             <div class="stat-label">Critical Students</div>
-            <div class="stat-value danger-text">4</div>
+            <div class="stat-value danger-text" id="counselorStatCritical">...</div>
             <div class="stat-glow red"></div>
           </div>
           <div class="stat-card">
             <div class="stat-icon cyan"><i class="fas fa-clock"></i></div>
             <div class="stat-label">Awaiting Intervention</div>
-            <div class="stat-value">6</div>
+            <div class="stat-value" id="counselorStatAwaiting">...</div>
             <div class="stat-glow cyan"></div>
           </div>
         </div>
@@ -351,6 +354,53 @@
 
         <div class="risk-cards-grid" id="counselorCards">
           <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <section class="page-content page-section" id="page-counseling-management">
+        <div class="page-header">
+          <h2>Counseling Management</h2>
+          <p>Schedule, track, and complete counseling sessions for high-risk students</p>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:16px;">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-comments"></i></div>
+            <div class="stat-label">Active Sessions</div>
+            <div class="stat-value" id="counselingMgmtActive">0</div>
+            <div class="stat-glow blue"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon cyan"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-label">Completed Sessions</div>
+            <div class="stat-value" id="counselingMgmtCompleted">0</div>
+            <div class="stat-glow cyan"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Counseling Session Queue</h3>
+            <button class="btn btn-outline btn-sm" onclick="loadCounselingSessions()"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Class</th>
+                  <th>Scheduled At</th>
+                  <th>Status</th>
+                  <th>Student Message</th>
+                  <th>Faculty Message</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="counselingSessionsTableBody">
+                <tr><td colspan="7" class="text-muted" style="text-align:center;padding:16px;">No counseling sessions scheduled yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -417,6 +467,15 @@
             </table>
           </div>
         </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header">
+            <h3>Counseling Updates for Your Students</h3>
+          </div>
+          <div class="card-body" id="facultyCounselingMessages">
+            <div class="text-muted">No counseling updates yet.</div>
+          </div>
+        </div>
       </section>
 
       <!-- ============================================================ -->
@@ -432,22 +491,16 @@
         <div class="card mb-3">
           <div class="card-body">
             <div class="student-risk-display">
-              <div class="risk-circle" id="riskCircle">
-                <svg viewBox="0 0 200 200">
-                  <circle class="risk-circle-bg" cx="100" cy="100" r="90" />
-                  <circle class="risk-circle-fill" cx="100" cy="100" r="90" id="riskCircleFill" />
-                </svg>
+              <div class="risk-circle" style="width:120px;height:120px;margin-bottom:16px;">
                 <div style="position:relative;z-index:2;text-align:center;">
-                  <div class="risk-value">78</div>
-                  <div class="risk-label">Risk Score</div>
+                  <div class="risk-value" style="font-size:32px;color:var(--accent-secondary);">🛡️</div>
+                  <div class="risk-label">Support</div>
                 </div>
               </div>
-              <h3 style="color:var(--danger);margin-bottom:8px;font-size:20px;">⚠ High Risk — Immediate Attention
-                Required</h3>
+              <h3 style="color:var(--accent-secondary);margin-bottom:8px;font-size:20px;">Support Plan Available</h3>
               <p class="risk-explanation">
-                Your dropout risk has been identified as <strong style="color:var(--danger);">HIGH</strong> due to
-                declining attendance (below 60%), reduced internal marks, and pending tuition fees. Please reach out to
-                your assigned counselor for support.
+                Your support team is monitoring your progress and has enabled personalized assistance for attendance,
+                academics, counseling, and fee planning. Check the sections below for active updates and next steps.
               </p>
             </div>
           </div>
@@ -458,17 +511,73 @@
           <div class="support-card">
             <div class="support-icon blue"><i class="fas fa-comments"></i></div>
             <h4>Counseling Assigned</h4>
-            <p>Dr. Meena Sharma · <span class="text-cyan">Active</span></p>
+            <p id="studentSupportCounseling">No session yet · <span class="text-cyan">Pending</span></p>
           </div>
           <div class="support-card">
             <div class="support-icon purple"><i class="fas fa-rupee-sign"></i></div>
             <h4>Financial Support</h4>
-            <p>Fee waiver application · <span class="text-cyan">Under Review</span></p>
+            <p id="studentSupportFinancial">No case yet · <span class="text-cyan">Pending</span></p>
           </div>
           <div class="support-card">
             <div class="support-icon cyan"><i class="fas fa-book"></i></div>
             <h4>Academic Support</h4>
-            <p>Extra tutoring assigned · <span class="text-cyan">Scheduled</span></p>
+            <p id="studentSupportAcademic">Learning plan · <span class="text-cyan">In Progress</span></p>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <h3>Counseling Sessions & Messages</h3>
+          </div>
+          <div class="card-body" id="studentCounselingMessages">
+            <div class="text-muted">No counseling sessions scheduled for you yet.</div>
+          </div>
+        </div>
+
+        <div class="two-col-grid mb-3">
+          <div class="card">
+            <div class="card-header">
+              <h3>My Weekly Action Plan</h3>
+            </div>
+            <div class="card-body" id="studentActionPlanList">
+              <div class="text-muted">Action plan will appear based on your active support items.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>Support Timeline</h3>
+            </div>
+            <div class="card-body" id="studentSupportTimeline">
+              <div class="text-muted">No timeline updates yet.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <h3>Ask for Help</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group" style="max-width:260px;">
+              <label>Category</label>
+              <select id="studentHelpCategory">
+                <option value="">Select</option>
+                <option>Academic</option>
+                <option>Counseling</option>
+                <option>Financial</option>
+                <option>Attendance</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Message</label>
+              <textarea id="studentHelpMessage" rows="3" placeholder="Describe what support you need..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="submitStudentHelpRequest()"><i class="fas fa-paper-plane"></i> Send Request</button>
+
+            <div style="margin-top:14px;" id="studentHelpRequestList">
+              <div class="text-muted">No help requests submitted yet.</div>
+            </div>
           </div>
         </div>
 
@@ -1123,6 +1232,34 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="counselingScheduleModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="counselingScheduleTitle">Schedule Counseling Session</h3>
+        <button class="modal-close" onclick="closeModal('counselingScheduleModal')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Session Date & Time</label>
+          <input type="datetime-local" id="counselingScheduleAt" />
+        </div>
+        <div class="form-group">
+          <label>Message to Student</label>
+          <textarea id="counselingMessageStudent" rows="3" placeholder="Supportive message for student..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Message to Faculty</label>
+          <textarea id="counselingMessageFaculty" rows="3" placeholder="Coordination message for faculty..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Session Notes</label>
+          <textarea id="counselingScheduleNotes" rows="3" placeholder="Optional prep notes..."></textarea>
+        </div>
+        <button class="btn btn-primary w-full" onclick="submitCounselingSchedule()"><i class="fas fa-calendar-check"></i> Schedule Session</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Risk Trend Modal -->
   <div class="modal-overlay" id="riskTrendModal">
     <div class="modal risk-trend-modal">
@@ -1280,8 +1417,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="auth.js?v=10"></script>
-  <script src="app.js?v=10"></script>
+  <script src="auth.js?v=14"></script>
+  <script src="app.js?v=15"></script>
 
 </body>
 

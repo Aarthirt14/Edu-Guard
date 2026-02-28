@@ -11,6 +11,11 @@ let selectedInterventionStudentId = null;
 let userManagementAccounts = [];
 let financialCases = [];
 let selectedFinancialCaseId = null;
+let counselingSessions = [];
+let selectedCounselingStudentId = null;
+let studentFinancialCase = null;
+let studentAttendanceChart = null;
+let studentMarksChart = null;
 
 function getAuthHeaders(extra = {}) {
   const user = getCurrentUser();
@@ -219,6 +224,9 @@ function renderAdminTable() {
 
 function renderHighRiskTable() {
   const tbody = document.getElementById("highRiskTableBody");
+  const user = getCurrentUser();
+  const isCounselor = user?.role === "counselor";
+
   if (!highRiskStudents.length) {
     tbody.innerHTML = `
       <tr>
@@ -251,10 +259,18 @@ function renderHighRiskTable() {
         <div class="risk-factors">${renderFactors(s.factors)}</div>
       </td>
       <td>
-        <span class="badge badge-${s.intervention === 'Active' ? 'active' : s.intervention === 'Pending' ? 'pending' : 'danger'}">${s.intervention === 'None' ? '⚠ None' : s.intervention}</span>
+        ${(() => {
+          if (isCounselor) {
+            const counseling = getCounselingStatusForStudent(s.id);
+            return `<span class="badge badge-${counseling.cls}">${counseling.label}</span>`;
+          }
+          return `<span class="badge badge-${s.intervention === 'Active' ? 'active' : s.intervention === 'Pending' ? 'pending' : 'danger'}">${s.intervention === 'None' ? '⚠ None' : s.intervention}</span>`;
+        })()}
       </td>
       <td>
-        <button class="btn btn-primary btn-sm" onclick="openInterventionModal('${s.id}')"><i class="fas fa-hand-holding-heart"></i> Assign</button>
+        ${isCounselor
+          ? `<button class="btn btn-ghost btn-sm" onclick="openTimelineModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-history"></i> Timeline</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="openInterventionModal('${s.id}')"><i class="fas fa-hand-holding-heart"></i> Assign</button>`}
       </td>
     </tr>
   `).join("");
@@ -575,6 +591,7 @@ async function loadStudentFinancialSupportCase() {
 
   try {
     const c = await fetchAPI('/api/financial-support/my-case');
+    studentFinancialCase = c;
     hubCard.style.display = '';
 
     document.getElementById('studentFeeOutstandingAmount').value = c.fee_outstanding_amount ?? '';
@@ -596,8 +613,11 @@ async function loadStudentFinancialSupportCase() {
         ? `<strong>AI Suggestions:</strong><br/>${c.ai_recommendations.map(t => `• ${escapeHtml(t)}`).join('<br/>')}`
         : '';
     }
+    await refreshStudentDashboardEnhancements();
   } catch (e) {
+    studentFinancialCase = null;
     hubCard.style.display = 'none';
+    await refreshStudentDashboardEnhancements();
   }
 }
 
@@ -842,9 +862,57 @@ function updateFacultyStats(classStudents, assignedClass) {
   if (immediateEl) immediateEl.textContent = immediateCount;
 }
 
+function updateCounselorStats() {
+  const requiringEl = document.getElementById("counselorStatRequiring");
+  const activeSessionsEl = document.getElementById("counselorStatActiveSessions");
+  const criticalEl = document.getElementById("counselorStatCritical");
+  const awaitingEl = document.getElementById("counselorStatAwaiting");
+
+  if (!requiringEl && !activeSessionsEl && !criticalEl && !awaitingEl) return;
+
+  const requiringCounseling = highRiskStudents.length;
+  const activeSessions = counselingSessions.filter(i => String(i.status || "").toLowerCase() === "active").length;
+  const criticalStudents = highRiskStudents.filter(s => Number(s.riskScore || 0) >= 85).length;
+  const awaitingIntervention = highRiskStudents.filter(s => s.intervention === "None").length;
+
+  if (requiringEl) requiringEl.textContent = requiringCounseling;
+  if (activeSessionsEl) activeSessionsEl.textContent = activeSessions;
+  if (criticalEl) criticalEl.textContent = criticalStudents;
+  if (awaitingEl) awaitingEl.textContent = awaitingIntervention;
+}
+
+function getCounselingStatusForStudent(studentId) {
+  const sessions = counselingSessions
+    .filter(s => s.student_id === studentId)
+    .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
+
+  if (!sessions.length) return { label: "Not Scheduled", cls: "pending" };
+
+  const latest = sessions[0];
+  const status = String(latest.status || "").toLowerCase();
+  if (status === "completed") return { label: "Completed", cls: "completed" };
+  if (status === "active") return { label: "Active", cls: "active" };
+  return { label: latest.status || "Pending", cls: "pending" };
+}
+
 function renderCounselorCards() {
   const container = document.getElementById("counselorCards");
-  container.innerHTML = highRiskStudents.slice(0, 8).map(s => `
+  if (!container) return;
+
+  updateCounselorStats();
+
+  if (!highRiskStudents.length) {
+    container.innerHTML = `
+      <div class="card" style="grid-column:1/-1;">
+        <div class="card-body text-muted" style="text-align:center;">No high-risk student profiles available.</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = highRiskStudents.slice(0, 8).map(s => {
+    const counseling = getCounselingStatusForStudent(s.id);
+    return `
     <div class="risk-card">
       <div class="glow-overlay"></div>
       <div class="risk-card-header">
@@ -856,18 +924,411 @@ function renderCounselorCards() {
       </div>
       <div class="risk-factors-row">${renderFactors(s.factors)}</div>
       <div class="risk-detail">
-        <span><i class="fas fa-calendar-alt"></i></span> Last update: Feb 24, 2026
+        <span><i class="fas fa-calendar-alt"></i></span> Last update: ${getCounselorStudentLastUpdate(s.id)}
       </div>
       <div class="risk-detail">
-        <span><i class="fas fa-clipboard-check"></i></span> Status: <span class="badge badge-${s.intervention === 'Active' ? 'active' : s.intervention === 'Pending' ? 'pending' : 'danger'}" style="margin-left:4px;">${s.intervention === 'None' ? '⚠ None' : s.intervention}</span>
+        <span><i class="fas fa-comments"></i></span> Counseling: <span class="badge badge-${counseling.cls}" style="margin-left:4px;">${counseling.label}</span>
+      </div>
+      <div class="risk-detail">
+        <span><i class="fas fa-clipboard-check"></i></span> Other Interventions: <span class="badge badge-${s.intervention === 'Active' ? 'active' : s.intervention === 'Pending' ? 'pending' : 'danger'}" style="margin-left:4px;">${s.intervention === 'None' ? '⚠ None' : s.intervention}</span>
       </div>
       <div class="risk-card-actions">
-        <button class="btn btn-primary btn-sm"><i class="fas fa-comments"></i> Counseling</button>
-        <button class="btn btn-outline btn-sm"><i class="fas fa-rupee-sign"></i> Financial</button>
-        <button class="btn btn-outline btn-sm"><i class="fas fa-book"></i> Academic</button>
+        <button class="btn btn-ghost btn-sm" onclick="openTimelineModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-history"></i> Timeline</button>
+        <button class="btn btn-outline btn-sm" onclick="openRiskTrendModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-chart-line"></i> Trend</button>
       </div>
     </div>
+  `;
+  }).join("");
+}
+
+async function loadCounselingSessions() {
+  const user = getCurrentUser();
+  if (!user || !["admin", "counselor", "faculty", "student"].includes(user.role)) {
+    counselingSessions = [];
+    return;
+  }
+
+  try {
+    const rows = await fetchAPI('/api/counseling/sessions/me');
+    counselingSessions = Array.isArray(rows) ? rows : [];
+  } catch (e) {
+    counselingSessions = [];
+  }
+
+  renderCounselingManagementTable();
+  renderFacultyCounselingMessages();
+  renderStudentCounselingMessages();
+  updateCounselorStats();
+}
+
+function openCounselingScheduleModal(studentId, studentName, className) {
+  selectedCounselingStudentId = studentId;
+
+  const title = document.getElementById("counselingScheduleTitle");
+  const whenEl = document.getElementById("counselingScheduleAt");
+  const studentMsgEl = document.getElementById("counselingMessageStudent");
+  const facultyMsgEl = document.getElementById("counselingMessageFaculty");
+  const notesEl = document.getElementById("counselingScheduleNotes");
+
+  if (title) title.textContent = `Schedule Counseling Session — ${studentName} (${className})`;
+  if (whenEl) {
+    const dt = new Date(Date.now() + 60 * 60 * 1000);
+    const local = new Date(dt.getTime() - (dt.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+    whenEl.value = local;
+  }
+  if (studentMsgEl) studentMsgEl.value = "We are scheduling a counseling support session to help you stay on track.";
+  if (facultyMsgEl) facultyMsgEl.value = `Counseling scheduled for ${studentName}. Please coordinate attendance and follow-up.`;
+  if (notesEl) notesEl.value = "";
+
+  openModal("counselingScheduleModal");
+}
+
+async function submitCounselingSchedule() {
+  if (!selectedCounselingStudentId) {
+    alert("Please select a student for counseling.");
+    return;
+  }
+
+  const when = document.getElementById("counselingScheduleAt")?.value;
+  const msgStudent = document.getElementById("counselingMessageStudent")?.value?.trim() || null;
+  const msgFaculty = document.getElementById("counselingMessageFaculty")?.value?.trim() || null;
+  const notes = document.getElementById("counselingScheduleNotes")?.value?.trim() || null;
+
+  if (!when) {
+    alert("Please choose session date and time.");
+    return;
+  }
+
+  try {
+    await fetchAPI('/api/counseling/sessions', {
+      method: 'POST',
+      body: JSON.stringify({
+        student_id: selectedCounselingStudentId,
+        scheduled_at: new Date(when).toISOString(),
+        message_to_student: msgStudent,
+        message_to_faculty: msgFaculty,
+        notes,
+      }),
+    });
+
+    closeModal('counselingScheduleModal');
+    const user = getCurrentUser();
+    if (user) {
+      await fetchDashboardData(user);
+      await loadCounselingSessions();
+      renderAdminTable();
+      renderHighRiskTable();
+      renderInterventionsTable();
+      renderFacultyTable();
+      renderCounselorCards();
+    }
+    alert("Counseling session scheduled.");
+  } catch (err) {
+    alert('Failed to schedule counseling session: ' + err.message);
+  }
+}
+
+function renderCounselingManagementTable() {
+  const tbody = document.getElementById("counselingSessionsTableBody");
+  const activeEl = document.getElementById("counselingMgmtActive");
+  const completedEl = document.getElementById("counselingMgmtCompleted");
+
+  const activeCount = counselingSessions.filter(s => String(s.status || "").toLowerCase() === "active").length;
+  const completedCount = counselingSessions.filter(s => String(s.status || "").toLowerCase() === "completed").length;
+
+  if (activeEl) activeEl.textContent = activeCount;
+  if (completedEl) completedEl.textContent = completedCount;
+
+  if (!tbody) return;
+
+  if (!counselingSessions.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:16px;">No counseling sessions scheduled yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = counselingSessions.map(s => {
+    const dt = new Date(s.scheduled_at);
+    const whenText = isNaN(dt.getTime()) ? "—" : dt.toLocaleString();
+    const statusLower = String(s.status || "").toLowerCase();
+    const badge = statusLower === "completed" ? "completed" : "active";
+    const canComplete = statusLower !== "completed";
+    return `
+      <tr>
+        <td>${escapeHtml(s.student_name || s.student_id || "—")}</td>
+        <td>${escapeHtml(s.class_name || "—")}</td>
+        <td>${whenText}</td>
+        <td><span class="badge badge-${badge}">${escapeHtml(s.status || "—")}</span></td>
+        <td>${escapeHtml(s.message_to_student || "—")}</td>
+        <td>${escapeHtml(s.message_to_faculty || "—")}</td>
+        <td>
+          ${canComplete
+            ? `<button class="btn btn-primary btn-sm" onclick="completeCounselingSession(${s.id})"><i class="fas fa-check"></i> Complete</button>`
+            : '<span class="text-muted">Completed</span>'}
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+async function completeCounselingSession(sessionId) {
+  const notes = prompt("Completion notes (optional):", "") || "";
+  try {
+    await fetchAPI(`/api/counseling/sessions/${sessionId}/complete`, {
+      method: 'PUT',
+      body: JSON.stringify({ completion_notes: notes, outcome: 'Improved' }),
+    });
+
+    const user = getCurrentUser();
+    if (user) {
+      await fetchDashboardData(user);
+      await loadCounselingSessions();
+      renderInterventionsTable();
+      renderCounselorCards();
+    }
+    alert('Counseling session marked as completed.');
+  } catch (err) {
+    alert('Failed to complete counseling session: ' + err.message);
+  }
+}
+
+function renderFacultyCounselingMessages() {
+  const container = document.getElementById("facultyCounselingMessages");
+  if (!container) return;
+
+  if (!counselingSessions.length) {
+    container.innerHTML = '<div class="text-muted">No counseling updates yet.</div>';
+    return;
+  }
+
+  container.innerHTML = counselingSessions.slice(0, 6).map(s => {
+    const dt = new Date(s.scheduled_at);
+    const whenText = isNaN(dt.getTime()) ? "—" : dt.toLocaleString();
+    return `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border-color);">
+        <div style="font-weight:600;">${escapeHtml(s.student_name || s.student_id || "Student")}</div>
+        <div class="text-muted" style="font-size:12px;">${whenText} · ${escapeHtml(s.status || "")}</div>
+        <div style="font-size:13px;margin-top:4px;">${escapeHtml(s.message_to_faculty || "Counseling session scheduled.")}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderStudentCounselingMessages() {
+  const container = document.getElementById("studentCounselingMessages");
+  if (!container) return;
+
+  if (!counselingSessions.length) {
+    container.innerHTML = '<div class="text-muted">No counseling sessions scheduled for you yet.</div>';
+    return;
+  }
+
+  container.innerHTML = counselingSessions.slice(0, 5).map(s => {
+    const dt = new Date(s.scheduled_at);
+    const whenText = isNaN(dt.getTime()) ? "—" : dt.toLocaleString();
+    return `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border-color);">
+        <div style="font-weight:600;">Session: ${whenText}</div>
+        <div class="text-muted" style="font-size:12px;">Status: ${escapeHtml(s.status || "")}</div>
+        <div style="font-size:13px;margin-top:4px;">${escapeHtml(s.message_to_student || "Your counselor has scheduled a support session.")}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderStudentSupportCards() {
+  const counselingEl = document.getElementById("studentSupportCounseling");
+  const financialEl = document.getElementById("studentSupportFinancial");
+  const academicEl = document.getElementById("studentSupportAcademic");
+
+  if (counselingEl) {
+    const latest = counselingSessions
+      .slice()
+      .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())[0];
+
+    if (latest) {
+      counselingEl.innerHTML = `${escapeHtml(latest.counselor_name || "Counselor")} · <span class="text-cyan">${escapeHtml(latest.status || "Active")}</span>`;
+    } else {
+      counselingEl.innerHTML = `No session yet · <span class="text-cyan">Pending</span>`;
+    }
+  }
+
+  if (financialEl) {
+    if (studentFinancialCase) {
+      const status = escapeHtml(studentFinancialCase.status || "Under Review");
+      const label = escapeHtml(studentFinancialCase.admin_plan_type || "Support Case");
+      financialEl.innerHTML = `${label} · <span class="text-cyan">${status}</span>`;
+    } else {
+      financialEl.innerHTML = `No case yet · <span class="text-cyan">Pending</span>`;
+    }
+  }
+
+  if (academicEl) {
+    const activeCounseling = counselingSessions.some(s => String(s.status || "").toLowerCase() === "active");
+    academicEl.innerHTML = activeCounseling
+      ? `Follow-up with faculty · <span class="text-cyan">Scheduled</span>`
+      : `Learning plan · <span class="text-cyan">In Progress</span>`;
+  }
+}
+
+function renderStudentActionPlanAndTimeline() {
+  const planEl = document.getElementById("studentActionPlanList");
+  const timelineEl = document.getElementById("studentSupportTimeline");
+  if (!planEl && !timelineEl) return;
+
+  const actions = [];
+  const timeline = [];
+
+  const latestActiveCounseling = counselingSessions
+    .slice()
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+    .find(s => String(s.status || "").toLowerCase() === "active") || null;
+
+  if (latestActiveCounseling) {
+    const dt = new Date(latestActiveCounseling.scheduled_at);
+    const whenText = isNaN(dt.getTime()) ? "upcoming" : dt.toLocaleString();
+    actions.push(`Attend counseling session on ${whenText}.`);
+    timeline.push({ title: "Counseling Session", detail: whenText, kind: "Active" });
+  }
+
+  if (studentFinancialCase) {
+    const status = String(studentFinancialCase.status || "");
+    timeline.push({ title: "Financial Support Case", detail: status, kind: "Support" });
+
+    if (status.toLowerCase().includes("awaiting") || status.toLowerCase().includes("input")) {
+      actions.push("Submit your fee support details to help admin prepare your support plan.");
+    }
+    if (studentFinancialCase.admin_plan) {
+      actions.push("Review your admin support plan and follow the next payment/scholarship step.");
+      timeline.push({ title: "Admin Plan Shared", detail: studentFinancialCase.admin_plan_type || "Support Plan", kind: "Plan" });
+    }
+  }
+
+  actions.push("Keep attendance consistent this week and complete pending assignments.");
+
+  if (planEl) {
+    planEl.innerHTML = `
+      <ul style="display:grid;gap:8px;list-style:none;">
+        ${actions.slice(0, 5).map(a => `<li style="padding-left:14px;position:relative;"><span style="position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:50%;background:var(--accent-primary);"></span>${escapeHtml(a)}</li>`).join("")}
+      </ul>
+    `;
+  }
+
+  if (timelineEl) {
+    if (!timeline.length) {
+      timelineEl.innerHTML = '<div class="text-muted">No timeline updates yet.</div>';
+    } else {
+      timelineEl.innerHTML = timeline.slice(0, 6).map(t => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--border-color);">
+          <div style="font-weight:600;">${escapeHtml(t.title)}</div>
+          <div class="text-muted" style="font-size:12px;">${escapeHtml(t.detail)} · ${escapeHtml(t.kind)}</div>
+        </div>
+      `).join("");
+    }
+  }
+}
+
+function renderStudentHelpRequests() {
+  const container = document.getElementById("studentHelpRequestList");
+  if (!container) return;
+
+  const raw = localStorage.getItem("eduguard_student_help_requests");
+  const rows = raw ? JSON.parse(raw) : [];
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="text-muted">No help requests submitted yet.</div>';
+    return;
+  }
+
+  container.innerHTML = rows.slice(0, 6).map(r => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border-color);">
+      <div style="font-weight:600;">${escapeHtml(r.category)}</div>
+      <div class="text-muted" style="font-size:12px;">${escapeHtml(r.time)}</div>
+      <div style="font-size:13px;margin-top:4px;">${escapeHtml(r.message)}</div>
+    </div>
   `).join("");
+}
+
+function submitStudentHelpRequest() {
+  const category = document.getElementById("studentHelpCategory")?.value?.trim();
+  const message = document.getElementById("studentHelpMessage")?.value?.trim();
+
+  if (!category || !message) {
+    alert("Please select category and enter your message.");
+    return;
+  }
+
+  const raw = localStorage.getItem("eduguard_student_help_requests");
+  const rows = raw ? JSON.parse(raw) : [];
+  rows.unshift({
+    category,
+    message,
+    time: new Date().toLocaleString(),
+  });
+
+  localStorage.setItem("eduguard_student_help_requests", JSON.stringify(rows.slice(0, 20)));
+
+  const categoryEl = document.getElementById("studentHelpCategory");
+  const messageEl = document.getElementById("studentHelpMessage");
+  if (categoryEl) categoryEl.value = "";
+  if (messageEl) messageEl.value = "";
+
+  renderStudentHelpRequests();
+  alert("Help request submitted. Your support team will review it.");
+}
+
+async function updateStudentTrendCharts() {
+  const studentId = studentFinancialCase?.student_id || counselingSessions[0]?.student_id || null;
+  if (!studentId) return;
+
+  try {
+    const trend = await fetchAPI(`/api/students/${studentId}/risk-trend`);
+    const attendancePoints = Array.isArray(trend.attendance_points) ? trend.attendance_points : [];
+    const marksPoints = Array.isArray(trend.marks_points) ? trend.marks_points : [];
+
+    const attendanceLabels = attendancePoints.map(p => `Week ${p.week}`);
+    const attendanceValues = attendancePoints.map(p => p.value);
+    const marksLabels = marksPoints.map(p => `Week ${p.week}`);
+    const marksValues = marksPoints.map(p => p.value);
+
+    if (studentAttendanceChart && attendanceLabels.length) {
+      studentAttendanceChart.data.labels = attendanceLabels;
+      studentAttendanceChart.data.datasets[0].data = attendanceValues;
+      studentAttendanceChart.update();
+    }
+
+    if (studentMarksChart && marksLabels.length) {
+      studentMarksChart.data.labels = marksLabels;
+      studentMarksChart.data.datasets[0].data = marksValues;
+      studentMarksChart.update();
+    }
+  } catch (e) {
+    // Keep default chart if student trend endpoint is unavailable for this account mapping.
+  }
+}
+
+async function refreshStudentDashboardEnhancements() {
+  renderStudentSupportCards();
+  renderStudentActionPlanAndTimeline();
+  renderStudentHelpRequests();
+  await updateStudentTrendCharts();
+}
+
+function getCounselorStudentLastUpdate(studentId) {
+  const studentInterventions = interventions
+    .filter(iv => iv.studentId === studentId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const latestDate = studentInterventions[0]?.date;
+  if (!latestDate) return "No intervention updates";
+
+  const dt = new Date(latestDate);
+  return isNaN(dt.getTime()) ? "No intervention updates" : dt.toLocaleDateString();
+}
+
+function openInterventionModalWithType(studentId, type) {
+  openInterventionModal(studentId);
+  const typeSelect = document.getElementById("interventionTypeSelect");
+  if (typeSelect) typeSelect.value = type;
 }
 
 function populateInterventionStudentSelect() {
@@ -1101,7 +1562,7 @@ async function openRiskTrendModal(studentId, studentName) {
 const roleAccess = {
   admin: ["dashboard", "upload-data", "high-risk", "interventions", "analytics", "user-management", "settings"],
   faculty: ["faculty", "upload-data", "high-risk"],
-  counselor: ["counselor", "interventions", "high-risk"],
+  counselor: ["counselor", "counseling-management", "interventions", "high-risk"],
   student: ["student"]
 };
 
@@ -1202,6 +1663,12 @@ function showPage(page) {
       renderInterventionsTable();
       renderHighRiskTable();
       renderAdminTable();
+    })();
+  }
+
+  if (user && (page === "counselor" || page === "counseling-management" || page === "faculty" || page === "student")) {
+    (async () => {
+      await loadCounselingSessions();
     })();
   }
 
@@ -1348,7 +1815,7 @@ function initCharts() {
   // Student Attendance Chart
   const attCtx = document.getElementById("attendanceChart");
   if (attCtx) {
-    new Chart(attCtx.getContext("2d"), {
+    studentAttendanceChart = new Chart(attCtx.getContext("2d"), {
       type: "line",
       data: {
         labels: ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb"],
@@ -1376,7 +1843,7 @@ function initCharts() {
   // Student Marks Chart
   const mkCtx = document.getElementById("marksChart");
   if (mkCtx) {
-    new Chart(mkCtx.getContext("2d"), {
+    studentMarksChart = new Chart(mkCtx.getContext("2d"), {
       type: "line",
       data: {
         labels: ["IA-1", "IA-2", "IA-3", "Midterm", "IA-4", "IA-5"],
@@ -1951,6 +2418,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- Fetch Data ---
   await fetchDashboardData(user);
+  await loadCounselingSessions();
   await loadSettings();
   initializeFacultyWeekDropdown();
   initializeWeeklyUploadWeekDropdown();
@@ -1963,6 +2431,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCounselorCards();
   await loadStudentFinancialSupportCase();
   initCharts();
+  await refreshStudentDashboardEnhancements();
   animateRiskCircle();
 
   // --- Route to correct page from URL or default ---

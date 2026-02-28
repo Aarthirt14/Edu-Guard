@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     import app.models.intervention
     import app.models.settings
     import app.models.financial_support
+    import app.models.counseling_session
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Database tables ready")
 
