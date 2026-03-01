@@ -45,6 +45,9 @@
         <div class="nav-item" data-page="faculty" onclick="showPage('faculty')">
           <span class="nav-icon"><i class="fas fa-chalkboard-teacher"></i></span> Faculty
         </div>
+        <div class="nav-item" data-page="faculty-academic-support" onclick="showPage('faculty-academic-support')">
+          <span class="nav-icon"><i class="fas fa-book"></i></span> Academic Support
+        </div>
         <div class="nav-item" data-page="student" onclick="showPage('student')">
           <span class="nav-icon"><i class="fas fa-user-graduate"></i></span> Student View
         </div>
@@ -447,6 +450,22 @@
           </div>
         </div>
 
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header">
+            <h3>Student Login Password Management</h3>
+          </div>
+          <div class="card-body">
+            <div class="text-muted" style="margin-bottom:10px;">
+              Set one common password for all students. Students will login with Username = Student ID and this password.
+            </div>
+            <div class="flex items-center" style="gap:8px;flex-wrap:wrap;">
+              <input type="password" id="facultyStudentCommonPassword" placeholder="Enter common password"
+                style="min-width:260px;max-width:360px;" />
+              <button class="btn btn-primary btn-sm" onclick="setCommonStudentPassword()"><i class="fas fa-key"></i> Apply to All Students</button>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <h3>High Risk Students — CS-A</h3>
@@ -477,6 +496,37 @@
           </div>
           <div class="card-body" id="facultyCounselingMessages">
             <div class="text-muted">No counseling updates yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page-content page-section" id="page-faculty-academic-support">
+        <div class="page-header">
+          <h2>Academic Support</h2>
+          <p>AI-assisted academic support interventions for your class</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Assigned Academic Support Cases</h3>
+            <button class="btn btn-outline btn-sm" onclick="loadFacultyAcademicSupport()"><i class="fas fa-sync"></i> Refresh</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Class</th>
+                  <th>Status</th>
+                  <th>Assigned By</th>
+                  <th>AI Support Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="facultyAcademicSupportTableBody">
+                <tr><td colspan="6" class="text-muted" style="text-align:center;padding:16px;">No academic support interventions assigned yet.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
