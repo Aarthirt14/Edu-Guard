@@ -5,8 +5,14 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models.user import User, UserRole
+from app.models.student import Student
 from app.schemas.auth import UserOut
-from app.schemas.user_management import UserCreateRequest, FacultyClassUpdateRequest
+from app.schemas.user_management import (
+    UserCreateRequest,
+    FacultyClassUpdateRequest,
+    StudentCommonPasswordRequest,
+    StudentCommonPasswordResponse,
+)
 from app.services.auth_service import require_role
 from app.core.security import hash_password
 
@@ -93,3 +99,73 @@ def update_faculty_class(
     db.commit()
     db.refresh(user)
     return UserOut.model_validate(user)
+
+
+@router.post(
+    "/students/common-password",
+    response_model=StudentCommonPasswordResponse,
+    summary="Admin/Faculty: Set one common password for all students",
+)
+def set_students_common_password(
+    payload: StudentCommonPasswordRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(UserRole.admin, UserRole.faculty)),
+):
+    password = (payload.password or "").strip()
+    if len(password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+
+    hashed = hash_password(password)
+    students = db.query(Student).all()
+
+    created = 0
+    updated = 0
+    linked = 0
+
+    for student in students:
+        student_user = None
+
+        if student.user_id:
+            student_user = db.query(User).filter(User.id == student.user_id).first()
+
+        if not student_user:
+            student_user = db.query(User).filter(User.id == student.id).first()
+
+        if not student_user:
+            base_email = f"{student.id.lower()}@students.eduguard.local"
+            email_candidate = base_email
+            suffix = 1
+            while db.query(User).filter(User.email == email_candidate).first():
+                email_candidate = f"{student.id.lower()}+{suffix}@students.eduguard.local"
+                suffix += 1
+
+            student_user = User(
+                id=student.id,
+                email=email_candidate,
+                hashed_password=hashed,
+                name=student.name,
+                role=UserRole.student,
+                is_active=True,
+            )
+            db.add(student_user)
+            created += 1
+        else:
+            student_user.hashed_password = hashed
+            student_user.role = UserRole.student
+            student_user.is_active = True
+            if not student_user.name:
+                student_user.name = student.name
+            updated += 1
+
+        if student.user_id != student_user.id:
+            student.user_id = student_user.id
+            linked += 1
+
+    db.commit()
+
+    return StudentCommonPasswordResponse(
+        total_students=len(students),
+        accounts_created=created,
+        accounts_updated=updated,
+        links_updated=linked,
+    )

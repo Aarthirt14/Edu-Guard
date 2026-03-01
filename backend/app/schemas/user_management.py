@@ -13,3 +13,14 @@ class UserCreateRequest(BaseModel):
 
 class FacultyClassUpdateRequest(BaseModel):
     assigned_class: str
+
+
+class StudentCommonPasswordRequest(BaseModel):
+    password: str
+
+
+class StudentCommonPasswordResponse(BaseModel):
+    total_students: int
+    accounts_created: int
+    accounts_updated: int
+    links_updated: int
