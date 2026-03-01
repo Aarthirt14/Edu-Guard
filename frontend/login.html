@@ -464,11 +464,14 @@
                 <!-- Login Form -->
                 <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
                     <div class="form-group">
-                        <label for="loginEmail">Email or User ID</label>
+                        <label for="loginEmail">Username (Email or Student ID)</label>
                         <div class="input-wrapper">
-                            <input type="text" id="loginEmail" placeholder="Enter your email or user ID" required
+                            <input type="text" id="loginEmail" placeholder="For students, enter Student ID (e.g., STU-1024)" required
                                 autocomplete="username" />
                             <i class="fas fa-envelope input-icon"></i>
+                        </div>
+                        <div class="text-muted" style="font-size:12px;margin-top:6px;">
+                            Student login uses Student ID + common password set in Faculty dashboard.
                         </div>
                     </div>
 
