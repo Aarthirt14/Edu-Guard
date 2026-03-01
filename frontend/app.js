@@ -26,6 +26,56 @@ function getAuthHeaders(extra = {}) {
   return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra };
 }
 
+function showUiNotice(message, type = "success") {
+  const containerId = "uiNoticeContainer";
+  let container = document.getElementById(containerId);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = containerId;
+    container.style.position = "fixed";
+    container.style.top = "16px";
+    container.style.right = "16px";
+    container.style.display = "flex";
+    container.style.flexDirection = "column";
+    container.style.gap = "10px";
+    container.style.zIndex = "9999";
+    container.style.maxWidth = "360px";
+    document.body.appendChild(container);
+  }
+
+  const notice = document.createElement("div");
+  notice.setAttribute("role", "status");
+  notice.style.background = "var(--bg-card)";
+  notice.style.color = "var(--text-primary)";
+  notice.style.border = `1px solid ${type === "error" ? "var(--danger)" : "var(--border-accent)"}`;
+  notice.style.borderRadius = "var(--radius-sm)";
+  notice.style.padding = "10px 12px";
+  notice.style.boxShadow = "var(--shadow-md)";
+  notice.style.fontSize = "13px";
+  notice.style.lineHeight = "1.4";
+  notice.style.opacity = "0";
+  notice.style.transform = "translateY(-6px)";
+  notice.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+  notice.textContent = message;
+
+  container.appendChild(notice);
+  requestAnimationFrame(() => {
+    notice.style.opacity = "1";
+    notice.style.transform = "translateY(0)";
+  });
+
+  setTimeout(() => {
+    notice.style.opacity = "0";
+    notice.style.transform = "translateY(-6px)";
+    setTimeout(() => {
+      notice.remove();
+      if (!container.childElementCount) {
+        container.remove();
+      }
+    }, 220);
+  }, 2600);
+}
+
 // ===== API FETCHING =====
 
 async function fetchAPI(endpoint, options = {}) {
@@ -94,11 +144,15 @@ async function fetchDashboardData(user) {
     interventions = rawInterventions.map(i => ({
       studentId: i.student_id,
       studentName: i.student_name || i.student_id,
+      className: i.class_name || "—",
       type: i.type,
       assignedBy: i.assigned_by,
       date: i.date_assigned ? new Date(i.date_assigned).toISOString().split('T')[0] : "N/A",
       status: i.status,
-      outcome: i.outcome || "—"
+      outcome: i.outcome || "—",
+      notes: i.notes || "",
+      aiSupportNote: i.ai_support_note || "",
+      aiSupportSource: i.ai_support_source || ""
     }));
 
     // Attach intervention statuses to highRiskStudents
@@ -229,6 +283,7 @@ function renderHighRiskTable() {
   const tbody = document.getElementById("highRiskTableBody");
   const user = getCurrentUser();
   const isCounselor = user?.role === "counselor";
+  const isFaculty = user?.role === "faculty";
 
   if (!highRiskStudents.length) {
     tbody.innerHTML = `
@@ -273,7 +328,9 @@ function renderHighRiskTable() {
       <td>
         ${isCounselor
           ? `<button class="btn btn-ghost btn-sm" onclick="openTimelineModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-history"></i> Timeline</button>`
-          : `<button class="btn btn-primary btn-sm" onclick="openInterventionModal('${s.id}')"><i class="fas fa-hand-holding-heart"></i> Assign</button>`}
+          : isFaculty
+            ? `<button class="btn btn-outline btn-sm" onclick="openRiskTrendModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-chart-line"></i> Trend</button>`
+            : `<button class="btn btn-primary btn-sm" onclick="openInterventionModal('${s.id}')"><i class="fas fa-hand-holding-heart"></i> Assign</button>`}
       </td>
     </tr>
   `).join("");
@@ -950,6 +1007,37 @@ async function updateFacultyClass(userId) {
   }
 }
 
+async function setCommonStudentPassword() {
+  const input = document.getElementById("facultyStudentCommonPassword");
+  const password = input?.value?.trim();
+
+  if (!password) {
+    alert("Please enter a common password.");
+    return;
+  }
+
+  if (password.length < 4) {
+    alert("Password must be at least 4 characters.");
+    return;
+  }
+
+  try {
+    const result = await fetchAPI('/api/users/students/common-password', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+
+    if (input) input.value = "";
+
+    alert(
+      `Student password updated. Total students: ${result.total_students}, ` +
+      `accounts created: ${result.accounts_created}, updated: ${result.accounts_updated}, links updated: ${result.links_updated}.`
+    );
+  } catch (e) {
+    alert("Failed to update common student password.");
+  }
+}
+
 function refreshAnalytics() {
   return;
 }
@@ -974,12 +1062,10 @@ function renderFacultyTable() {
     `;
     return;
   }
-
-  tbody.innerHTML = classStudents.map(s => `
+  tbody.innerHTML = classStudents.map((s) => `
     <tr>
       <td>
         <div class="student-info">
-          <div class="student-avatar">${getInitials(s.name)}</div>
           <div>
             <div class="student-name">${s.name}</div>
             <div class="student-id-text">${s.id}</div>
@@ -1010,6 +1096,109 @@ function renderFacultyTable() {
       </td>
     </tr>
   `).join("");
+}
+
+function renderFacultyAcademicSupportTable() {
+  const tbody = document.getElementById("facultyAcademicSupportTableBody");
+  if (!tbody) return;
+
+  const rows = interventions.filter(i => String(i.type || "") === "Academic Support");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:16px;">No academic support interventions assigned yet.</td></tr>';
+    return;
+  }
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const ta = Date.parse(String(a.date || ""));
+    const tb = Date.parse(String(b.date || ""));
+    return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
+  });
+
+  const latestByStudent = [];
+  const seen = new Set();
+  for (const row of sortedRows) {
+    const key = String(row.studentId || row.studentName || "").trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    latestByStudent.push(row);
+  }
+
+  tbody.innerHTML = latestByStudent.map(i => {
+    const status = String(i.status || "").toLowerCase();
+    const badge = status === "completed" ? "completed" : status === "active" ? "active" : "pending";
+    const mappedStudent = highRiskStudents.find(s => s.id === i.studentId);
+    const className = i.className || mappedStudent?.class || "—";
+    const studentLabel = i.studentName || i.studentId || "—";
+    const studentSafe = String(studentLabel).replace(/'/g, "\\'");
+    const rawNotes = String(i.notes || "").trim();
+    const isLegacyPlaceholder = /^no plan notes shared yet\.?$/i.test(rawNotes);
+    const hasManualNotes = Boolean(rawNotes) && !isLegacyPlaceholder;
+    const hasAiNotes = Boolean(String(i.aiSupportNote || "").trim());
+    const supportNotes = hasManualNotes
+      ? rawNotes
+      : hasAiNotes
+        ? String(i.aiSupportNote || "").trim()
+        : "AI plan unavailable for this case.";
+    const sourceLabel = hasManualNotes
+      ? "Admin Note"
+      : (() => {
+          const source = String(i.aiSupportSource || "").toLowerCase();
+          if (source === "rule-based") return "Rule-based Plan";
+          if (source === "gemini" || source === "anthropic" || source === "llm") return "AI Generated";
+          return "AI Status";
+        })();
+
+    return `
+      <tr>
+        <td>${escapeHtml(studentLabel)}</td>
+        <td>${escapeHtml(className)}</td>
+        <td><span class="badge badge-${badge}">${escapeHtml(i.status || "Pending")}</span></td>
+        <td>${escapeHtml(i.assignedBy || "—")}</td>
+        <td style="max-width:360px;">
+          <span class="text-cyan" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">${escapeHtml(sourceLabel)}</span>
+          ${formatSupportNoteHtml(supportNotes)}
+        </td>
+        <td>
+          <div class="flex items-center" style="gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="openTimelineModal('${i.studentId}', '${studentSafe}')"><i class="fas fa-history"></i> Timeline</button>
+            <button class="btn btn-outline btn-sm" onclick="openRiskTrendModal('${i.studentId}', '${studentSafe}')"><i class="fas fa-chart-line"></i> Trend</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function formatSupportNoteHtml(note) {
+  const compact = String(note || "").replace(/\s+/g, " ").replace(/\.\.+/g, ".").trim();
+  if (!compact) {
+    return '<span class="text-muted">No plan notes available.</span>';
+  }
+
+  const parts = compact
+    .split('. ')
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => p.endsWith('.') ? p.slice(0, -1) : p);
+
+  if (parts.length <= 1) {
+    return escapeHtml(compact);
+  }
+
+  return `<ul style="margin:0;padding-left:16px;line-height:1.4;">${parts.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+}
+
+async function loadFacultyAcademicSupport() {
+  const user = getCurrentUser();
+  if (!user || user.role !== "faculty") return;
+
+  try {
+    await fetchDashboardData(user);
+  } catch (e) {
+    console.error("Failed to load faculty academic support", e);
+  }
+
+  renderFacultyAcademicSupportTable();
 }
 
 function updateFacultyStats(classStudents, assignedClass) {
@@ -1103,6 +1292,7 @@ function renderCounselorCards() {
         <span><i class="fas fa-clipboard-check"></i></span> Other Interventions: <span class="badge badge-${s.intervention === 'Active' ? 'active' : s.intervention === 'Pending' ? 'pending' : 'danger'}" style="margin-left:4px;">${s.intervention === 'None' ? '⚠ None' : s.intervention}</span>
       </div>
       <div class="risk-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="openCounselingScheduleModal('${s.id}', '${s.name.replace(/'/g, "\\'")}', '${s.class.replace(/'/g, "\\'")}')"><i class="fas fa-calendar-check"></i> Schedule</button>
         <button class="btn btn-ghost btn-sm" onclick="openTimelineModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-history"></i> Timeline</button>
         <button class="btn btn-outline btn-sm" onclick="openRiskTrendModal('${s.id}', '${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-chart-line"></i> Trend</button>
       </div>
@@ -1241,7 +1431,7 @@ function renderCounselingManagementTable() {
 }
 
 async function completeCounselingSession(sessionId) {
-  const notes = prompt("Completion notes (optional):", "") || "";
+  const notes = "";
   try {
     await fetchAPI(`/api/counseling/sessions/${sessionId}/complete`, {
       method: 'PUT',
@@ -1255,9 +1445,9 @@ async function completeCounselingSession(sessionId) {
       renderInterventionsTable();
       renderCounselorCards();
     }
-    alert('Counseling session marked as completed.');
+    showUiNotice('Counseling session marked as completed.', 'success');
   } catch (err) {
-    alert('Failed to complete counseling session: ' + err.message);
+    showUiNotice('Failed to complete counseling session: ' + err.message, 'error');
   }
 }
 
@@ -1495,12 +1685,6 @@ function getCounselorStudentLastUpdate(studentId) {
   return isNaN(dt.getTime()) ? "No intervention updates" : dt.toLocaleDateString();
 }
 
-function openInterventionModalWithType(studentId, type) {
-  openInterventionModal(studentId);
-  const typeSelect = document.getElementById("interventionTypeSelect");
-  if (typeSelect) typeSelect.value = type;
-}
-
 function populateInterventionStudentSelect() {
   const select = document.getElementById("interventionStudentSelect");
   if (!select) return;
@@ -1516,6 +1700,7 @@ function openInterventionModal(studentId = null) {
   populateInterventionStudentSelect();
 
   const select = document.getElementById("interventionStudentSelect");
+
   if (select) {
     if (studentId) {
       select.value = studentId;
@@ -1617,10 +1802,11 @@ async function openTimelineModal(studentId, studentName) {
     body.innerHTML = events.map(evt => {
       const dt = new Date(evt.recorded_at);
       const dateText = isNaN(dt.getTime()) ? "N/A" : dt.toLocaleDateString();
+      const cleanDescription = String(evt.description || "").replace(/\s*\[RAG:[\s\S]*?\]\s*$/i, "").trim();
       return `
         <div class="timeline-item">
           <div class="timeline-date">${dateText}</div>
-          <div class="timeline-content"><strong>${evt.event_type}</strong> — ${escapeHtml(evt.description)}</div>
+          <div class="timeline-content"><strong>${evt.event_type}</strong> — ${escapeHtml(cleanDescription)}</div>
         </div>
       `;
     }).join('');
@@ -1731,7 +1917,7 @@ async function openRiskTrendModal(studentId, studentName) {
 
 const roleAccess = {
   admin: ["dashboard", "upload-data", "high-risk", "interventions", "analytics", "agent-copilot", "user-management", "settings"],
-  faculty: ["faculty", "upload-data", "high-risk"],
+  faculty: ["faculty", "faculty-academic-support", "upload-data", "high-risk"],
   counselor: ["counselor", "counseling-management", "interventions", "high-risk"],
   student: ["student"]
 };
@@ -1863,6 +2049,12 @@ function showPage(page) {
   if (user && user.role === 'student' && page === 'student') {
     (async () => {
       await loadStudentFinancialSupportCase();
+    })();
+  }
+
+  if (user && user.role === 'faculty' && page === 'faculty-academic-support') {
+    (async () => {
+      await loadFacultyAcademicSupport();
     })();
   }
 }
