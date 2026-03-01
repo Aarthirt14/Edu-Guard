@@ -291,12 +291,14 @@ def _ensure_intervention_and_timeline(db: Session, action_row: Dict[str, Any], a
         db.add(intervention)
         db.flush()
 
+    clean_reason = re.sub(r"\s*\[RAG:[\s\S]*?\]\s*$", "", str(action_row.get("reason_summary") or ""), flags=re.IGNORECASE).strip()
+
     db.add(
         TimelineEvent(
             intervention_id=intervention.id,
             student_id=student.id,
             event_type="AI Copilot Alert",
-            description=action_row["reason_summary"],
+            description=clean_reason,
         )
     )
 
