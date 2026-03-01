@@ -4,7 +4,7 @@
 from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 from typing import List
-from app.models.intervention import Intervention, InterventionStatus, InterventionOutcome, TimelineEvent
+from app.models.intervention import Intervention, InterventionStatus, InterventionOutcome, TimelineEvent, InterventionType
 from app.models.student import Student
 from app.models.user import User
 from app.schemas.intervention import InterventionCreate, InterventionUpdate, InterventionStats
@@ -50,10 +50,26 @@ def create_intervention(db: Session, data: InterventionCreate, current_user: Use
     return iv
 
 
-def list_interventions(db: Session, student_id: str = None) -> List[Intervention]:
+def list_interventions(
+    db: Session,
+    student_id: str = None,
+    intervention_type: str | None = None,
+    class_name: str | None = None,
+) -> List[Intervention]:
     query = db.query(Intervention).options(joinedload(Intervention.student))
+
+    if class_name:
+        query = query.join(Student, Intervention.student_id == Student.id).filter(Student.class_name == class_name)
+
     if student_id:
         query = query.filter(Intervention.student_id == student_id)
+
+    if intervention_type:
+        try:
+            query = query.filter(Intervention.type == InterventionType(intervention_type))
+        except Exception:
+            return []
+
     return query.order_by(Intervention.date_assigned.desc()).all()
 
 

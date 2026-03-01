@@ -31,11 +31,14 @@ class InterventionOut(BaseModel):
     id: int
     student_id: str
     student_name: Optional[str] = None
+    class_name: Optional[str] = None
     type: InterventionType
     assigned_by: str
     status: InterventionStatus
     outcome: InterventionOutcome
     notes: Optional[str] = None
+    ai_support_note: Optional[str] = None
+    ai_support_source: Optional[str] = None
     date_assigned: datetime
 
     model_config = {"from_attributes": True}
