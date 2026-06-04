@@ -34,31 +34,16 @@ let selectedRole = null;
 
 (function checkExistingSession() {
     if (!document.querySelector(".login-page")) return;
-    
-    let user = null;
     const stored = localStorage.getItem("eduguard_user");
     if (stored) {
         try {
-            user = JSON.parse(stored);
+            const user = JSON.parse(stored);
+            if (user && user.role && rolePageMap[user.role]) {
+                window.location.href = "dashboard.html?page=" + rolePageMap[user.role];
+            }
         } catch (e) {
             localStorage.removeItem("eduguard_user");
         }
-    }
-
-    // IF ON LOGIN PAGE: Automatically assign demo user and redirect to index.html
-    if (!user) {
-        user = { 
-            id: "admin1", 
-            email: "admin@eduguard.com", 
-            role: "admin", 
-            name: "Dr. Arun Kumar (Demo)",
-            source: "mock" 
-        };
-        localStorage.setItem("eduguard_user", JSON.stringify(user));
-    }
-
-    if (user && user.role && rolePageMap[user.role]) {
-        window.location.href = "index.html?page=" + rolePageMap[user.role];
     }
 })();
 
@@ -176,7 +161,7 @@ async function handleLogin(e) {
             localStorage.removeItem("eduguard_token");
         }
         localStorage.setItem("eduguard_user", JSON.stringify(session));
-        window.location.href = "index.html?page=" + rolePageMap[session.role];
+        window.location.href = "dashboard.html?page=" + rolePageMap[session.role];
     } else {
         showError("Invalid credentials. Please check your email, password, and selected role.");
         btn.classList.remove("loading");
@@ -230,16 +215,8 @@ function getLoggedInUser() {
 function enforceAuth() {
     const user = getCurrentUser();
     if (!user) {
-        // DEMO MODE: Default to Admin instead of redirecting to login.html
-        const demoAdmin = { 
-            id: "admin1", 
-            email: "admin@eduguard.com", 
-            role: "admin", 
-            name: "Dr. Arun Kumar (Demo)",
-            source: "mock" 
-        };
-        localStorage.setItem("eduguard_user", JSON.stringify(demoAdmin));
-        return demoAdmin;
+        window.location.href = "login.html";
+        return null;
     }
     return user;
 }
