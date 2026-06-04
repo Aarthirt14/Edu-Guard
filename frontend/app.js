@@ -78,6 +78,10 @@ function showUiNotice(message, type = "success") {
 
 // ===== API FETCHING =====
 
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+  ? 'http://127.0.0.1:8000' 
+  : ''; // Use relative path if deployed on same host, or override via env
+
 async function fetchAPI(endpoint, options = {}) {
   const user = getCurrentUser();
   const headers = getAuthHeaders(options.headers || {});
@@ -85,7 +89,10 @@ async function fetchAPI(endpoint, options = {}) {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`http://127.0.0.1:8000${endpoint}`, { ...options, headers });
+  // Auto-detect production URL if it exists in a config or global variable
+  const baseUrl = window.EDU_GUARD_API_URL || API_BASE_URL;
+  
+  const res = await fetch(`${baseUrl}${endpoint}`, { ...options, headers });
   if (!res.ok) {
     if (res.status === 401) {
       if (!user || user.source !== "mock") {
@@ -458,7 +465,8 @@ async function downloadReport(kind) {
   if (!endpoint) return;
 
   try {
-    const res = await fetch(`http://127.0.0.1:8000${endpoint}`, {
+    const baseUrl = window.EDU_GUARD_API_URL || API_BASE_URL;
+    const res = await fetch(`${baseUrl}${endpoint}`, {
       method: "GET",
       headers: getAuthHeaders(),
     });
