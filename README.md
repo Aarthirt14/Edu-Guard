@@ -40,6 +40,12 @@ An autonomous backend engine that runs continuously:
 - Produces LLM-driven **Intervention Strategies** (e.g., "Marks dropped 20% while attendance is stable — recommend academic peer-mentorship")
 - Integrates with external workflows via Slack / n8n / Email
 
+### 🔗 n8n Workflow Integration
+The AI Copilot is designed to feed into an autonomous **n8n orchestration layer**:
+- **Webhook Integration**: Real-time delivery of risk "Action Tickets" to n8n endpoints.
+- **Escalation Logic**: n8n can automatically notify counselors via Slack, log entries in Google Sheets, or send customized emails to faculty.
+- **Payload Format**: Standardized JSON containing student ID, risk level, prioritized reason, and recommended intervention.
+
 ### Financial Support Hub
 Bridges students at financial risk directly to institutional support:
 - Students submit income, parent occupation, and preferred aid type (installment plan vs. scholarship)
