@@ -215,8 +215,16 @@ function getLoggedInUser() {
 function enforceAuth() {
     const user = getCurrentUser();
     if (!user) {
-        window.location.href = "login.html";
-        return null;
+        // DEMO MODE: Default to Admin instead of redirecting to login.html
+        const demoAdmin = { 
+            id: "admin1", 
+            email: "admin@eduguard.com", 
+            role: "admin", 
+            name: "Dr. Arun Kumar (Demo)",
+            source: "mock" 
+        };
+        localStorage.setItem("eduguard_user", JSON.stringify(demoAdmin));
+        return demoAdmin;
     }
     return user;
 }
