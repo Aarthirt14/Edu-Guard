@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         from app.db.seed import run_seed
-        run_seed(db, include_demo_data=False, purge_demo_data=True)
+        run_seed(db, include_demo_data=True, purge_demo_data=True)
     finally:
         db.close()
 

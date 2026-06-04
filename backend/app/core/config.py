@@ -28,10 +28,21 @@ class Settings(BaseSettings):
 
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
+    
+    # Ollama (Local AI)
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3"
+    
+    # AI Backend Selection (anthropic, ollama, gemini)
+    AI_BACKEND: str = "ollama" 
 
     # Google AI Studio (Gemini)
     GOOGLE_AI_STUDIO_API_KEY: str = ""
     GOOGLE_AI_MODEL: str = "gemini-1.5-flash"
+
+    # Automation (n8n)
+    N8N_WEBHOOK_URL: str = ""
+    N8N_API_KEY: str = ""
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:5500,http://127.0.0.1:5500,http://localhost:5501,http://127.0.0.1:5501,http://localhost:3000"
