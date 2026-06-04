@@ -21,7 +21,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: create tables, seed data, warm up ML models."""
+    """Startup: create folders, create tables, seed data, warm up ML models."""
+    import os
+    # Ensure directories exist
+    os.makedirs("data", exist_ok=True)
+    os.makedirs(os.path.join("app", "ml"), exist_ok=True)
+    os.makedirs(os.path.join("app", "ml", "data"), exist_ok=True)
+    
     logger.info("🚀 EduGuard AI Backend starting up...")
 
     # Create all DB tables
