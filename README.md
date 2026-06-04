@@ -71,7 +71,8 @@ python3 -m http.server 5500
 # Or using VS Code Live Server on login.html
 ```
 
-Visit: `http://localhost:5500/login.html`
+Visit: `http://localhost:5500/` (Dashboard defaults to Admin)
+Visit: `http://localhost:5500/login.html` (Manual role selection)
 
 ---
 
