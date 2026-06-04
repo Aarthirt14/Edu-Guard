@@ -1,6 +1,0 @@
-id,name,class_name,semester,Family_Income,Scholarship,Education_Loan,Father_Occupation,Mother_Occupation,Parent_Education,Home_Location,HighSchool_Grade,Admission_Quota
-STU-3001,Aarav Sharma,CS-A,Semester 4,12000,No,Yes,Daily Wage Worker,Homemaker,HighSchool,Rural,65,Management
-STU-3002,Diya Patel,CS-B,Semester 3,45000,Yes,No,Engineer,Teacher,Graduate,Urban,88,Merit
-STU-3003,Rohan Gupta,EC-A,Semester 5,18000,No,Yes,Farmer,Homemaker,HighSchool,Rural,70,Merit
-STU-3004,Meera Joshi,ME-A,Semester 2,75000,Yes,No,Doctor,Teacher,Postgraduate,Urban,95,Merit
-STU-3005,Karan Singh,CE-A,Semester 6,15000,No,Yes,Daily Wage Worker,Daily Wage Worker,Primary School,Rural,60,Management
