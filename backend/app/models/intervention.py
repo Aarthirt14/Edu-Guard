@@ -1,7 +1,7 @@
 # ============================================================
 # app/models/intervention.py — Interventions table
 # ============================================================
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, Enum
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text, Enum, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.database import Base
@@ -40,6 +40,8 @@ class Intervention(Base):
     assigned_by_id = Column(String, ForeignKey("users.id"), nullable=True)
     status = Column(Enum(InterventionStatus), default=InterventionStatus.pending)
     outcome = Column(Enum(InterventionOutcome), default=InterventionOutcome.none)
+    initial_risk_score = Column(Float, nullable=True)
+    final_risk_score = Column(Float, nullable=True)
     notes = Column(Text, nullable=True)
     date_assigned = Column(DateTime(timezone=True), server_default=func.now())
     date_updated = Column(DateTime(timezone=True), onupdate=func.now())
