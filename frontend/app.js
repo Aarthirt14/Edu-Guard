@@ -80,7 +80,7 @@ function showUiNotice(message, type = "success") {
 
 const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
   ? 'http://127.0.0.1:8000' 
-  : ''; // Use relative path if deployed on same host, or override via env
+  : 'https://edu-guard.onrender.com'; // Point to live Render backend
 
 async function fetchAPI(endpoint, options = {}) {
   const user = getCurrentUser();

@@ -4,7 +4,9 @@
    Falls back to mock data if backend unavailable
    ========================================== */
 
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? "http://127.0.0.1:8000/api" 
+    : "https://edu-guard.onrender.com/api";
 
 // ===== FALLBACK MOCK USERS (if backend is offline) =====
 
