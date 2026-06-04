@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: eduguard-backend
+    env: docker
+    plan: free
+    region: ohio
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./data/eduguard.db
+      - key: AI_BACKEND
+        value: gemini
+      - key: GOOGLE_AI_MODEL
+        value: gemini-1.5-flash
