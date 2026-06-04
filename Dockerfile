@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install python dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir google-generativeai
+RUN pip install --no-cache-dir google-generativeai bcrypt==4.0.1
 
 # Final stage
 FROM python:3.11-slim
