@@ -20,10 +20,10 @@ def get_dashboard_stats(db: Session, threshold: int = 70) -> DashboardStats:
     high_risk = db.query(Student).filter(Student.risk_score >= threshold).count()
 
     one_week_ago = datetime.utcnow() - timedelta(days=7)
-    new_this_week = db.query(RiskHistory).filter(
-        RiskHistory.risk_score >= threshold,
-        RiskHistory.recorded_at >= one_week_ago
-    ).distinct(RiskHistory.student_id).count()
+    first_high = db.query(RiskHistory.student_id,
+        func.min(RiskHistory.recorded_at).label("first_seen")).filter(
+            RiskHistory.risk_score >= threshold).group_by(RiskHistory.student_id).subquery()
+    new_this_week = db.query(first_high).filter(first_high.c.first_seen >= one_week_ago).count()
 
     active_ivs = db.query(Intervention).filter(
         Intervention.status == InterventionStatus.active
@@ -47,11 +47,11 @@ def get_analytics(db: Session, threshold: int = 70) -> AnalyticsResponse:
     for i in range(5, -1, -1):
         dt = datetime.utcnow() - timedelta(days=30 * i)
         label = dt.strftime("%b")
-        count = db.query(RiskHistory).filter(
+        count = db.query(func.count(func.distinct(RiskHistory.student_id))).filter(
             RiskHistory.risk_score >= threshold,
             extract("month", RiskHistory.recorded_at) == dt.month,
             extract("year", RiskHistory.recorded_at) == dt.year,
-        ).count()
+        ).scalar()
         months.append(RiskTrendPoint(month=label, count=count))
 
     # Factor distribution

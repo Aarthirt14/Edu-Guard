@@ -20,6 +20,7 @@ from app.services.intervention_service import (create_intervention, list_interve
 from app.services.academic_support_ai_service import generate_academic_support_note
 from app.services.auth_service import get_current_user, require_role
 from app.models.user import User, UserRole
+from app.services.access import ensure_student_access
 
 router = APIRouter(prefix="/interventions", tags=["Interventions"])
 
@@ -100,9 +101,10 @@ def update(
 def timeline(
     student_id: str,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Used by the Timeline Modal in the frontend."""
+    ensure_student_access(db, current_user, student_id)
     events = get_timeline(db, student_id)
     cleaned: List[TimelineEventOut] = []
     for evt in events:

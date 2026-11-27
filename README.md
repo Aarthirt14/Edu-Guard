@@ -1,139 +1,98 @@
-# 🛡️ EduGuard AI — Student Dropout Prevention System
+# EduGuard — Explainable Student Early Warning and Intervention Tracking
 
-Predicting dropout risk before it becomes dropout reality — using dual ML models, blended risk scoring, and an autonomous AI Copilot.
+A final-year research prototype built with FastAPI, scikit-learn, SQLAlchemy and vanilla JavaScript.
 
----
+**Validation status: synthetic demonstration only.** No real-world dropout accuracy, warning lead time or intervention effectiveness has been established. Scores are uncalibrated model outputs, not verified dropout probabilities. This project supports staff review; it must not make automated educational decisions.
 
-## What It Does
-EduGuard is a full-stack agentic AI system that gives institutions a proactive early-warning engine for student dropout. Rather than reacting to failing grades, it monitors both baseline socio-economic vulnerability and real-time behavioral shifts — flagging at-risk students weeks before intervention becomes urgent.
+## Working workflow
 
----
+1. Admin imports admission CSV/JSON. Missing background fields remain missing.
+2. Faculty imports weekly observations for their assigned class. IA scores are normalised using `IA_Max` (40 by default); displayed student marks are percentages.
+3. One shared prediction service saves scores, input fingerprint, model version, data completeness and feature sensitivities. Weekly predictions require at least two observations. Incomplete profiles can use weekly-only scoring; insufficient data produces an unknown score.
+4. Staff inspect observed trends and prediction evidence in the Risk Trend dialog.
+5. Copilot reads the saved prediction and creates reviewable proposals with policy references. Repeated runs do not duplicate open proposals. Approval creates a pending intervention; it does not send external notifications.
+6. Staff record an owner, due date, acceptance and follow-up evidence. Completion requires observations and a closure reason. Follow-up measurements remain separate from model inputs.
+7. Evaluation compares attendance rules, admission-only, weekly-only and combined models on the same held-out cohort.
 
-## 🤖 ML Architecture
-EduGuard runs two independent classifiers and dynamically blends their scores as the semester progresses.
+## Local setup
 
-| | Model 1 — Early Risk | Model 2 — Dynamic Risk |
-|---|---|---|
-| **Algorithm** | RandomForest | GradientBoosting |
-| **Trained on** | 10,000 baseline records | 10,000 longitudinal records |
-| **Input features** | Family income, parental education, scholarship status, home location, admission quota | Attendance slope (4-week trend), internal marks trajectory, backlog accumulation, fee payment status |
-| **Trigger** | At admission | Weekly (faculty data upload) |
-| **Purpose** | Detect socio-economic risk at entry | Detect sudden behavioral risk spikes |
+Python 3.12 is tested. From the repository root:
 
-**Blended Scoring** — Weights shift from 60/40 (baseline/dynamic) early in the semester to 20/80 by the end, reflecting the increasing signal quality of behavioral data over time.
-
----
-
-## 🌟 Key Features
-
-### Role-Based Portals
-Four dedicated dashboards, each scoped to a distinct workflow:
-- **Admin** — Institution-wide risk trends, financial support management, AI Copilot controls
-- **Faculty** — Class-level monitoring, attendance/marks uploads, student account management
-- **Counselor** — Intervention queue, risk trend diagnostics per student, session scheduling
-- **Student** — Personal risk transparency, scholarship guidance, help request channel
-
-### AI Agent Copilot
-An autonomous backend engine that runs continuously:
-- Scans for risk escalations across the student database
-- Auto-generates structured **Action Tickets** for high-priority cases
-- Produces LLM-driven **Intervention Strategies** (e.g., "Marks dropped 20% while attendance is stable — recommend academic peer-mentorship")
-- Integrates with external workflows via Slack / n8n / Email
-
-### 🔗 n8n Workflow Integration
-The AI Copilot is designed to feed into an autonomous **n8n orchestration layer**:
-- **Webhook Integration**: Real-time delivery of risk "Action Tickets" to n8n endpoints.
-- **Escalation Logic**: n8n can automatically notify counselors via Slack, log entries in Google Sheets, or send customized emails to faculty.
-- **Payload Format**: Standardized JSON containing student ID, risk level, prioritized reason, and recommended intervention.
-
-### Financial Support Hub
-Bridges students at financial risk directly to institutional support:
-- Students submit income, parent occupation, and preferred aid type (installment plan vs. scholarship)
-- Admins review AI-annotated cases and publish custom support plans to student portals
-
-### Reporting
-- **High Risk PDF Summary** — Stakeholder-ready reports with risk breakdowns
-- **Intervention Tracker (Excel)** — Audit trail for counselor actions
-- **Monthly Trend Reports** — Longitudinal efficacy analysis
-
----
-
-## 🚀 Quick Start
-
-### Backend
 ```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env
 cd backend
-pip install -r requirements.txt
-cp .env.example .env
-# Add your ANTHROPIC_API_KEY or GOOGLE_AI_STUDIO_API_KEY to .env
 uvicorn app.main:app --reload
 ```
-On first run, the backend auto-generates 20,000 rows of synthetic training data and trains both models.
 
-### Frontend
+In a second terminal:
+
 ```bash
 cd frontend
 python -m http.server 5500
 ```
-- Landing page → `http://localhost:5500/`
-- Dashboard → `http://localhost:5500/dashboard.html`
 
----
+Open http://localhost:5500/dashboard.html. API documentation: http://localhost:8000/docs.
 
-## 🔑 Demo Credentials
+First startup generates synthetic training data and trains versioned demo models; this can take a minute. Generated CSVs, databases and models are ignored by git. Startup preserves existing records and backfills missing v3 predictions without reseeding or deleting them.
 
-| Role | Username | Password |
+`DEMO_MODE=true` (default) seeds demonstration accounts and synthetic weekly observations **only in an empty database**. Set `DEMO_MODE=false` to disable demo seeding; provision staff accounts separately. Existing demo accounts are not automatically removed. Use a separate database for authorised institutional data and set a strong `SECRET_KEY`.
+
+| Demo role | Email | Password |
 |---|---|---|
-| Admin | `admin@eduguard.com` | `admin123` |
-| Faculty | `faculty@eduguard.com` | `faculty123` |
-| Counselor | `counselor@eduguard.com` | `counselor123` |
-| Student | `student@eduguard.com` | `student123` |
+| Admin | admin@eduguard.com | admin123 |
+| Faculty | faculty@eduguard.com | faculty123 |
+| Counselor | counselor@eduguard.com | counselor123 |
+| Student | student@eduguard.com | student123 |
 
----
+## Upload formats
 
-## ⚙️ Environment Variables
+Admission columns:
 
-| Variable | Description |
-|---|---|
-| `AI_BACKEND` | `gemini` (recommended) or `ollama` |
-| `GOOGLE_AI_STUDIO_API_KEY` | API key from Google AI Studio |
-| `ANTHROPIC_API_KEY` | Anthropic API key (if using Claude backend) |
-| `DATABASE_URL` | SQLite path (defaults to local file) |
-| `EDU_GUARD_API_URL` | Frontend config pointing to the backend URL |
-
----
-
-## 📁 Project Structure
-```
-eduguard_combined/
-├── backend/
-│   └── app/
-│       ├── main.py           # FastAPI entry point
-│       ├── ml/               # Dual ML model training & inference
-│       ├── api/routes/       # Auth, Students, AI Chat, Reports
-│       ├── services/         # AI Copilot & business logic
-│       └── core/             # Config & security
-├── frontend/
-│   ├── index.html            # Marketing landing page
-│   ├── dashboard.html        # SPA app shell
-│   ├── login.html            # Authentication
-│   ├── app.js                # Dashboard & charting logic
-│   └── auth.js               # Token & role management
-└── render.yaml               # One-click cloud deployment config
+```csv
+id,name,class_name,semester,Family_Income,Scholarship,Education_Loan,Father_Occupation,Mother_Occupation,Parent_Education,Home_Location,HighSchool_Grade,Admission_Quota
+DEMO-1,Example Student,CS-A,Semester 1,25000,No,No,Teacher,Homemaker,Graduate,Urban,75,Merit
 ```
 
----
+`Admission_Quota` is retained for auditing but excluded from prediction features and synthetic label penalties. Income and other background variables can still act as proxies; omission of one sensitive feature does not establish fairness.
 
-## 🛠️ Tech Stack
-- **Layer**: Technology
-- **Backend**: FastAPI, Python
-- **ML**: scikit-learn (RandomForest, GradientBoosting)
-- **AI Copilot**: Claude (Anthropic) / Gemini (Google)
-- **Frontend**: Vanilla JS, HTML/CSS
-- **Database**: SQLite
-- **Reports**: ReportLab (PDF), openpyxl (Excel)
-- **Deployment**: Render (render.yaml)
+Weekly columns:
 
----
+```csv
+Student_ID,Week_Number,Attendance_Percentage,IA_Marks,IA_Max,Semester_Marks,Backlog_Count,Fee_Outstanding
+DEMO-1,1,85,35,50,,0,No
+DEMO-1,2,70,30,50,,1,Yes
+```
 
-Built as a complete agentic AI solution for educational resilience.
+`Week_Number` is an absolute index across the tracked enrolment, not reset each semester. Re-uploading the same student/week replaces that observation. Empty IA is allowed; missing backlog or fee status is rejected. Invalid/unauthorised rows are reported. Prediction failure rolls back the weekly import. A 5 MB upload limit applies.
+
+## Evaluation and tests
+
+```bash
+cd backend
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests -q
+python -m app.ml.evaluate --synthetic --output evaluation-output
+# After obtaining authorised, anonymised records with observed outcomes:
+python -m app.ml.evaluate --data authorised_snapshots.csv --output evaluation-output-real
+```
+
+The evaluator saves metrics, held-out predictions and model artifacts. It uses older cohorts for training, the penultimate cohort for blend selection and the newest cohort for testing. Duplicate student IDs are rejected. Evaluation artifacts are separate from the deployed demonstration models.
+
+See [evaluation protocol](docs/EVALUATION.md) for the dataset contract, research limitations and synthetic results, and [implementation notes](docs/IMPLEMENTATION.md) for migration and demo instructions.
+
+## Policy configuration
+
+`backend/app/policies/support.json` contains versioned **example** policies marked `approved: false`. Replace them with institution-approved text and accurate document, section, version, effective date and approval metadata. Retrieved references are shown on each Copilot ticket. An optional Anthropic integration can propose wording; staff remain responsible for reviewing the recommendation. No API key is needed for the deterministic fallback.
+
+## Main components
+
+- `services/prediction_service.py`: canonical scoring, abstention and sensitivity explanations.
+- `services/access.py`: shared student/class access checks.
+- `api/routes/upload.py`: validation, marks conversion and transactional import.
+- `services/policy_service.py`: versioned local policy retrieval.
+- `ml/evaluate.py`: cohort evaluation and baseline comparison.
+- `tests/`: API isolation, prediction consistency, upload rollback and workflow tests.
+
+SQLite is supported for the local prototype. Existing SQLite schemas receive additive columns; back up the database before upgrading. A production database migration, real-data validation, probability calibration, independent fairness review and institutional approval remain deployment prerequisites.

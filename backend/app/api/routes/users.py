@@ -109,14 +109,19 @@ def update_faculty_class(
 def set_students_common_password(
     payload: StudentCommonPasswordRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role(UserRole.admin, UserRole.faculty)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.faculty)),
 ):
     password = (payload.password or "").strip()
     if len(password) < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
 
     hashed = hash_password(password)
-    students = db.query(Student).all()
+    query = db.query(Student)
+    if current_user.role == UserRole.faculty:
+        if not current_user.assigned_class:
+            raise HTTPException(403, "No assigned class")
+        query = query.filter(Student.class_name == current_user.assigned_class)
+    students = query.all()
 
     created = 0
     updated = 0

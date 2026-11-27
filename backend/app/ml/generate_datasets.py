@@ -87,8 +87,7 @@ def generate_static_data(n: int = 10000) -> pd.DataFrame:
     risk_score += np.array([father_risk[i] for i in father_occ_idx])
 
     # Admission quota
-    quota_risk = [8, 0, 3, 12, 8, 5]
-    risk_score += np.array([quota_risk[i] for i in admission_quota_idx])
+    # Admission category is retained for auditing only; never used to assign risk.
 
     # Add noise
     risk_score += rng.normal(0, 6, size=n)
@@ -280,6 +279,7 @@ def generate_all():
     dynamic_df = generate_engineered_data(10000)
     dynamic_df.to_csv(DATA_DIR / "engineered_training_data.csv", index=False)
 
+    (DATA_DIR / "synthetic_v3.marker").write_text("synthetic demonstration data; not real dropout outcomes")
     print(f"\n📁 Data saved to: {DATA_DIR}")
     print(f"   students_static.csv          → {len(static_df)} rows")
     print(f"   engineered_training_data.csv → {len(dynamic_df)} rows")

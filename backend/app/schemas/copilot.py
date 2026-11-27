@@ -21,6 +21,7 @@ class CopilotActionTicketOut(BaseModel):
     priority: str
     n8n_status: str
     n8n_reference: Optional[str] = None
+    policy_references: Optional[List[dict]] = None
     status: str
     created_at: Optional[datetime] = None
 

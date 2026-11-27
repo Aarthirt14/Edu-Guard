@@ -35,6 +35,11 @@ def schedule_counseling_session(db: Session, payload: CounselingSessionCreate, c
         status=InterventionStatus.active,
         outcome=InterventionOutcome.none,
         notes=payload.notes,
+        owner_id=current_user.id,
+        due_at=payload.scheduled_at,
+        initial_risk_score=student.risk_score,
+        baseline_attendance=student.attendance,
+        baseline_marks=student.marks,
     )
     db.add(intervention)
     db.flush()
@@ -97,6 +102,10 @@ def complete_session(db: Session, session_id: int, payload: CounselingSessionCom
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    if current_user.role == UserRole.counselor and session.counselor_id != current_user.id:
+        raise HTTPException(403, "This session is assigned to another counselor")
+    if not (payload.completion_notes or "").strip():
+        raise HTTPException(422, "Completion notes are required")
     session.status = "Completed"
     session.completion_notes = payload.completion_notes
 
@@ -105,6 +114,9 @@ def complete_session(db: Session, session_id: int, payload: CounselingSessionCom
         intervention = db.query(Intervention).filter(Intervention.id == session.intervention_id).first()
 
     if intervention:
+        intervention.closure_reason = "Counseling session completed"
+        intervention.follow_up_observation = payload.completion_notes
+        intervention.final_risk_score = intervention.student.risk_score
         intervention.status = InterventionStatus.completed
         intervention.outcome = payload.outcome or InterventionOutcome.stable
         db.add(TimelineEvent(

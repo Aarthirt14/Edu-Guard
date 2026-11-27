@@ -8,6 +8,8 @@ Run standalone: python -m app.ml.train_models
 Or called automatically on startup if models are missing.
 """
 import logging
+import json
+import hashlib
 import os
 import joblib
 import numpy as np
@@ -24,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 ML_DIR = Path(os.path.dirname(__file__))
 DATA_DIR = ML_DIR / "data"
-MODEL1_PATH = ML_DIR / "early_risk_model.pkl"
-MODEL2_PATH = ML_DIR / "dynamic_risk_model.pkl"
+MODEL1_PATH = ML_DIR / "early_risk_v3.pkl"
+MODEL2_PATH = ML_DIR / "dynamic_risk_v3.pkl"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -34,7 +36,7 @@ MODEL2_PATH = ML_DIR / "dynamic_risk_model.pkl"
 
 def train_early_risk_model():
     csv = DATA_DIR / "students_static.csv"
-    if not csv.exists():
+    if not (DATA_DIR / "synthetic_v3.marker").exists() or not csv.exists():
         from app.ml.generate_datasets import generate_all
         generate_all()
 
@@ -46,11 +48,11 @@ def train_early_risk_model():
     FEATURES = [
         "Family_Income", "Scholarship", "Education_Loan",
         "Father_Occupation", "Mother_Occupation", "Parent_Education",
-        "Home_Location", "HighSchool_Grade", "Admission_Quota"
+        "Home_Location", "HighSchool_Grade"
     ]
 
     cat_cols = ["Scholarship", "Education_Loan", "Father_Occupation",
-                "Mother_Occupation", "Parent_Education", "Home_Location", "Admission_Quota"]
+                "Mother_Occupation", "Parent_Education", "Home_Location"]
     num_cols = ["Family_Income", "HighSchool_Grade"]
 
     X = df[FEATURES]
@@ -75,6 +77,10 @@ def train_early_risk_model():
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     pipeline.fit(X_train, y_train)
+    pipeline.eduguard_reference = {
+        c: (float(X_train[c].median()) if c in num_cols else str(X_train[c].mode().iloc[0]))
+        for c in FEATURES
+    }
 
     y_pred = pipeline.predict(X_test)
     y_proba = pipeline.predict_proba(X_test)[:, 1]
@@ -89,6 +95,7 @@ def train_early_risk_model():
         "cat_cols": cat_cols,
         "num_cols": num_cols,
     }
+    save_training_metadata(csv, y_test, y_pred, y_proba, MODEL1_PATH)
     joblib.dump(payload, MODEL1_PATH)
     logger.info(f"✅ Model 1 saved → {MODEL1_PATH}")
     return pipeline
@@ -100,7 +107,7 @@ def train_early_risk_model():
 
 def train_dynamic_risk_model():
     csv = DATA_DIR / "engineered_training_data.csv"
-    if not csv.exists():
+    if not (DATA_DIR / "synthetic_v3.marker").exists() or not csv.exists():
         from app.ml.generate_datasets import generate_all
         generate_all()
 
@@ -111,10 +118,9 @@ def train_dynamic_risk_model():
         "ia_latest", "ia_avg", "has_ia_data",
         "backlog_current", "backlog_growing",
         "fee_outstanding", "weeks_tracked",
-        "Family_Income", "HighSchool_Grade", "Home_Location",
     ]
 
-    cat_cols = ["Home_Location"]
+    cat_cols = []
     num_cols = [f for f in FEATURES if f != "Home_Location"]
 
     X = df[FEATURES]
@@ -139,6 +145,10 @@ def train_dynamic_risk_model():
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
     pipeline.fit(X_train, y_train)
+    pipeline.eduguard_reference = {
+        c: (float(X_train[c].median()) if c in num_cols else str(X_train[c].mode().iloc[0]))
+        for c in FEATURES
+    }
 
     y_pred = pipeline.predict(X_test)
     y_proba = pipeline.predict_proba(X_test)[:, 1]
@@ -153,6 +163,7 @@ def train_dynamic_risk_model():
         "cat_cols": cat_cols,
         "num_cols": num_cols,
     }
+    save_training_metadata(csv, y_test, y_pred, y_proba, MODEL2_PATH)
     joblib.dump(payload, MODEL2_PATH)
     logger.info(f"✅ Model 2 saved → {MODEL2_PATH}")
     return pipeline
@@ -195,6 +206,17 @@ def load_dynamic_model():
 def load_both_models():
     load_early_model()
     load_dynamic_model()
+
+
+
+
+def save_training_metadata(csv, y, predicted, probability, model_path):
+    metadata = {"schema_version": "v3", "training_source": "synthetic_rule_generated",
+        "validation_status": "synthetic_only", "split": "random stratified demo split; not cohort evaluation",
+        "dataset_sha256": hashlib.sha256(csv.read_bytes()).hexdigest(),
+        "random_seed": 42, "classification_report": classification_report(y, predicted, output_dict=True),
+        "roc_auc": float(roc_auc_score(y, probability))}
+    model_path.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2))
 
 
 if __name__ == "__main__":

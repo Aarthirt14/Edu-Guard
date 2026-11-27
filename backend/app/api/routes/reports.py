@@ -69,7 +69,7 @@ def _make_excel_interventions(interventions) -> BytesIO:
     ws.title = "Interventions"
 
     headers = ["Student ID", "Student Name", "Type", "Assigned By",
-               "Date Assigned", "Status", "Outcome", "Notes"]
+               "Date Assigned", "Status", "Outcome", "Notes", "Owner", "Due", "Accepted", "Follow-up", "Closure reason", "Baseline attendance %", "Follow-up attendance %", "Baseline marks %", "Follow-up marks %"]
 
     blue_fill = PatternFill(start_color="2563EB", end_color="2563EB", fill_type="solid")
     for col, h in enumerate(headers, 1):
@@ -87,6 +87,16 @@ def _make_excel_interventions(interventions) -> BytesIO:
         ws.cell(row=row, column=6, value=iv.status.value)
         ws.cell(row=row, column=7, value=iv.outcome.value)
         ws.cell(row=row, column=8, value=iv.notes or "")
+        for col, value in enumerate([iv.owner_id, str(iv.due_at or ""), str(iv.accepted_at or ""),
+            iv.follow_up_observation, iv.closure_reason, iv.baseline_attendance,
+            iv.follow_up_attendance, iv.baseline_marks, iv.follow_up_marks], 9):
+            cell = ws.cell(row=row, column=col, value=value)
+            if isinstance(value, str):
+                cell.data_type = "s"
+        # User text must remain text, not an Excel formula.
+        for cell in ws[row]:
+            if isinstance(cell.value, str):
+                cell.data_type = "s"
 
     for col in ws.columns:
         ws.column_dimensions[col[0].column_letter].width = 18

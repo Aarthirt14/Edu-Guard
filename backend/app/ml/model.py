@@ -148,97 +148,19 @@ def predict_risk(
     backlog_count: int = 0,
 ) -> dict:
     """
-    Main prediction function — backwards compatible with existing API routes.
+    Legacy hypothetical scenario preview, not used for student scoring.
     Uses both models and blends them.
     """
-    # ── Model 1: Early Risk ──
-    father_occ = "Daily Wage Worker" if family_income < 20000 else ("Farmer" if family_income < 40000 else "Government Job")
-    mother_occ = "Homemaker" if family_income < 30000 else "Teacher"
-    parent_edu = "HighSchool" if family_income < 25000 else "Graduate"
-
-    early_score = predict_early_risk(
-        family_income=family_income,
-        scholarship=scholarship,
-        education_loan=education_loan,
-        father_occupation=father_occ,
-        mother_occupation=mother_occ,
-        parent_education=parent_edu,
-        home_location=home_location,
-        hs_grade=hs_grade,
-        admission_quota=admission_quota,
-    )
-
-    # ── Model 2: Dynamic Risk ──
-    att_avg_4w = attendance + (att_slope * 2)  # estimate
-    att_total_drop = max(0, 85 - attendance)
-    has_ia = 1 if weeks_tracked >= 3 else 0
-    ia_latest = marks * 0.4 if has_ia else 0.0  # rough: marks/100 * 40
-    fee_outstanding = 1 if has_financial_issue else 0
-    backlog_growing = 1 if (backlog_count > 0 and att_slope < 0) else 0
-
-    dynamic_score = predict_dynamic_risk(
-        att_current=attendance,
-        att_avg_4w=float(np.clip(att_avg_4w, 20, 100)),
-        att_total_drop=att_total_drop,
-        att_slope=att_slope,
-        ia_latest=ia_latest,
-        ia_avg=ia_latest,
-        has_ia_data=has_ia,
-        backlog_current=backlog_count,
-        backlog_growing=backlog_growing,
-        fee_outstanding=fee_outstanding,
-        weeks_tracked=weeks_tracked,
-        family_income=family_income,
-        hs_grade=hs_grade,
-        home_location=home_location,
-    )
-
-    final_score = blend_scores(early_score, dynamic_score, weeks_tracked)
-
-    # Determine risk level
-    if final_score >= 70:
-        level = "high"
-    elif final_score >= 40:
-        level = "medium"
-    else:
-        level = "low"
-
-    # Derive factors
+    # A single snapshot cannot supply observed weekly trends or an admission profile.
     factors = []
-    if has_financial_issue:
-        factors.append("financial")
     if attendance < 60:
         factors.append("attendance")
     if marks < 40:
         factors.append("academic")
+    if has_financial_issue:
+        factors.append("financial")
     if has_family_issue:
         factors.append("family")
-    if att_slope < -3:
-        factors.append("declining_trend")
-
-    # Recommendation
-    if level == "high":
-        if "financial" in factors and "attendance" in factors:
-            rec = "Immediate counseling + financial support required. Schedule within 24 hours."
-        elif "attendance" in factors or "declining_trend" in factors:
-            rec = "Critical attendance drop. Faculty must reach out and assign academic mentorship."
-        elif "financial" in factors:
-            rec = "Financial stress is primary driver. Connect with financial aid office immediately."
-        else:
-            rec = "Multiple risk factors detected. Assign a counselor and create intervention plan."
-    elif level == "medium":
-        rec = "Monitor closely. Consider preventive counseling and attendance follow-up."
-    else:
-        rec = "Student is currently low risk. Continue regular monitoring."
-
-    return {
-        "risk_score": final_score,
-        "baseline_risk_score": early_score,
-        "dynamic_risk_score": dynamic_score,
-        "risk_level": level,
-        "is_high_risk": level == "high",
-        "risk_factors": factors,
-        "recommendation": rec,
-        "confidence": round(final_score / 100, 3),
-        "weeks_tracked": weeks_tracked,
-    }
+    return {"risk_score": None, "risk_level": "unknown", "is_high_risk": False,
+            "risk_factors": factors, "recommendation": "Upload admission data or at least two weekly records for a model score.",
+            "data_status": "insufficient_data", "validation_status": "not_validated_on_real_outcomes"}

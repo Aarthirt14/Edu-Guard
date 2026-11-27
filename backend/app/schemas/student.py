@@ -2,7 +2,7 @@
 # app/schemas/student.py — Student request/response schemas
 # ============================================================
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime
 
 
@@ -18,10 +18,28 @@ class StudentBase(BaseModel):
 
 
 class StudentCreate(StudentBase):
+    family_income: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
+    scholarship: Optional[Literal["Yes", "No"]] = None
+    education_loan: Optional[Literal["Yes", "No"]] = None
+    father_occupation: Optional[str] = None
+    mother_occupation: Optional[str] = None
+    parent_education: Optional[str] = None
+    home_location: Optional[Literal["Rural", "Semi-Urban", "Urban"]] = None
+    hs_grade: Optional[float] = Field(None, ge=0, le=100)
+    admission_quota: Optional[str] = None
     id: str  # "STU-xxxx"
 
 
 class StudentUpdate(BaseModel):
+    family_income: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
+    scholarship: Optional[Literal["Yes", "No"]] = None
+    education_loan: Optional[Literal["Yes", "No"]] = None
+    father_occupation: Optional[str] = None
+    mother_occupation: Optional[str] = None
+    parent_education: Optional[str] = None
+    home_location: Optional[Literal["Rural", "Semi-Urban", "Urban"]] = None
+    hs_grade: Optional[float] = Field(None, ge=0, le=100)
+    admission_quota: Optional[str] = None
     attendance: Optional[float] = Field(None, ge=0, le=100)
     marks: Optional[float] = Field(None, ge=0, le=100)
     has_financial_issue: Optional[bool] = None
@@ -31,10 +49,11 @@ class StudentUpdate(BaseModel):
 
 class StudentOut(StudentBase):
     id: str
-    risk_score: float
+    risk_score: Optional[float]
     risk_trend: str
     risk_factors: List[str]
     counselor_id: Optional[str] = None
+    prediction: Optional[dict] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -62,9 +81,10 @@ class PredictRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    risk_score: float = Field(..., description="Score 0-100, higher = more at risk")
+    risk_score: Optional[float] = Field(..., description="Score 0-100, higher = more at risk")
     risk_level: str = Field(..., description="high | medium | low")
     is_high_risk: bool
     risk_factors: List[str]
     recommendation: str
-    confidence: float
+    data_status: str = "snapshot_only"
+    validation_status: str = "not_validated_on_real_outcomes"

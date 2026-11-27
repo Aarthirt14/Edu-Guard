@@ -1,0 +1,124 @@
+{
+  "provenance": "synthetic",
+  "validation_status": "synthetic_only",
+  "dataset_sha256": "4bbd2326e020275e1e9e9e7d16c94008d0a744ee96eedf6055f7d1f8b2808839",
+  "seed": 42,
+  "split": {
+    "train": {
+      "rows": 400,
+      "cohorts": [
+        "2022"
+      ]
+    },
+    "validation": {
+      "rows": 400,
+      "cohorts": [
+        "2023"
+      ]
+    },
+    "test": {
+      "rows": 400,
+      "cohorts": [
+        "2024"
+      ]
+    }
+  },
+  "selected_blend": "early_weight_0.0",
+  "validation_brier": {
+    "scheduled": 0.07862272503655596,
+    "early_weight_0.0": 0.06902912135504366,
+    "early_weight_0.2": 0.07131124320678887,
+    "early_weight_0.4": 0.09065002331187494,
+    "early_weight_0.6": 0.1270454616703018,
+    "early_weight_0.8": 0.18049755828206954,
+    "early_weight_1.0": 0.25100631314717803
+  },
+  "results": {
+    "attendance_threshold": {
+      "threshold": 0.7,
+      "precision": 0.5859375,
+      "recall": 0.9202453987730062,
+      "f1": 0.7159904534606205,
+      "pr_auc_average_precision": 0.5717062883435583,
+      "brier_score": 0.2975,
+      "false_alerts": 106,
+      "missed_outcomes": 13,
+      "confusion_matrix": {
+        "tn": 131,
+        "fp": 106,
+        "fn": 13,
+        "tp": 150
+      }
+    },
+    "admission_only": {
+      "threshold": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "pr_auc_average_precision": 0.4371326822629542,
+      "brier_score": 0.24762952401120472,
+      "false_alerts": 0,
+      "missed_outcomes": 163,
+      "confusion_matrix": {
+        "tn": 237,
+        "fp": 0,
+        "fn": 163,
+        "tp": 0
+      }
+    },
+    "weekly_only": {
+      "threshold": 0.7,
+      "precision": 0.9246575342465754,
+      "recall": 0.8282208588957055,
+      "f1": 0.8737864077669902,
+      "pr_auc_average_precision": 0.9702451942416019,
+      "brier_score": 0.0647839755790588,
+      "false_alerts": 11,
+      "missed_outcomes": 28,
+      "confusion_matrix": {
+        "tn": 226,
+        "fp": 11,
+        "fn": 28,
+        "tp": 135
+      }
+    },
+    "combined_selected": {
+      "threshold": 0.7,
+      "precision": 0.9246575342465754,
+      "recall": 0.8282208588957055,
+      "f1": 0.8737864077669902,
+      "pr_auc_average_precision": 0.9702451942416019,
+      "brier_score": 0.0647839755790588,
+      "false_alerts": 11,
+      "missed_outcomes": 28,
+      "confusion_matrix": {
+        "tn": 226,
+        "fp": 11,
+        "fn": 28,
+        "tp": 135
+      }
+    },
+    "combined_original_schedule": {
+      "threshold": 0.7,
+      "precision": 0.9473684210526315,
+      "recall": 0.7730061349693251,
+      "f1": 0.8513513513513513,
+      "pr_auc_average_precision": 0.9555991634309122,
+      "brier_score": 0.07745138934527032,
+      "false_alerts": 7,
+      "missed_outcomes": 37,
+      "confusion_matrix": {
+        "tn": 230,
+        "fp": 7,
+        "fn": 37,
+        "tp": 126
+      }
+    }
+  },
+  "limitations": [
+    "Uncalibrated scores; Brier measures probability error but does not establish calibration.",
+    "One snapshot per student; warning lead time requires dated longitudinal follow-up.",
+    "Observed outcomes do not establish intervention effectiveness.",
+    "Evaluation models are saved separately and are not automatically deployed."
+  ]
+}

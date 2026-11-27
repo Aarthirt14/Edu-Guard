@@ -36,7 +36,8 @@ class Student(Base):
     # --- Risk scores ---
     baseline_risk_score = Column(Float, nullable=True)          # Model 1 — set once
     dynamic_risk_score = Column(Float, nullable=True)           # Model 2 — updated weekly
-    risk_score = Column(Float, default=0.0)                     # Blended score
+    prediction = Column(JSON, nullable=True)
+    risk_score = Column(Float, nullable=True, default=None)                     # Blended score
     risk_trend = Column(String, default="stable")               # "up" | "down" | "stable"
     weeks_tracked = Column(Integer, default=0)
 
@@ -89,7 +90,8 @@ class RiskHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(String, ForeignKey("students.id"), nullable=False)
-    risk_score = Column(Float, nullable=False)
+    risk_score = Column(Float, nullable=True)
+    prediction = Column(JSON, nullable=True)
     recorded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     student = relationship("Student", back_populates="risk_history")

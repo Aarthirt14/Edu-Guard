@@ -46,13 +46,25 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         from app.db.seed import run_seed
-        run_seed(db, include_demo_data=True, purge_demo_data=True)
+        if settings.DEMO_MODE:
+            run_seed(db, include_demo_data=True, purge_demo_data=False)
     finally:
         db.close()
 
     # Warm up both ML models (trains & saves if not found)
     from app.ml.model import load_model
     load_model()
+    # Backfill versioned predictions without deleting or recreating user records.
+    from app.models.student import Student
+    from app.services.prediction_service import refresh_prediction, VERSION
+    db = SessionLocal()
+    try:
+        for student in db.query(Student).all():
+            if (student.prediction or {}).get("model_version") != VERSION:
+                refresh_prediction(db, student)
+        db.commit()
+    finally:
+        db.close()
 
     yield
 
@@ -129,8 +141,8 @@ def root():
         "status": "running",
         "docs": "/docs",
         "models": {
-            "model1": "RandomForest (Early Risk) — 82% accuracy, AUC 0.90",
-            "model2": "GradientBoosting (Dynamic Risk) — 95% accuracy, AUC 0.99",
+            "model1": "RandomForest admission model — synthetic demonstration only",
+            "model2": "GradientBoosting weekly model — synthetic demonstration only",
         }
     }
 

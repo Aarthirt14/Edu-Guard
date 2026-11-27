@@ -44,14 +44,8 @@ except Exception:
 
 
 AGENT_LLM_MODEL = "claude-3-5-sonnet-latest"
-COPILOT_PLAYBOOK = [
-    "If attendance is falling quickly (>=10 percentage points in recent weeks), prioritize counseling plus attendance contract with weekly follow-up.",
-    "If fee outstanding is present with moderate/high risk, prioritize Financial Support and initiate scholarship or installment counseling within 72 hours.",
-    "If IA marks are declining by >=20%, assign Academic Support with subject-wise remediation and a two-week progress checkpoint.",
-    "When both financial stress and attendance decline are present, combine Financial Support + Counseling and involve family outreach if consented.",
-    "Critical risk (>=85) requires immediate counselor assignment, parent/guardian communication, and a documented intervention plan within 48 hours.",
-    "High risk (75-84.9) requires intervention assignment this week and trend review after one week.",
-]
+from app.services.policy_service import retrieve_policy
+
 
 
 def _extract_json_object(raw_text: str) -> Optional[Dict[str, Any]]:
@@ -80,29 +74,22 @@ def _extract_json_object(raw_text: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _retrieve_rag_context(query: str, top_k: int = 2) -> List[str]:
-    if not query:
-        return COPILOT_PLAYBOOK[:top_k]
-    vectorizer = TfidfVectorizer(stop_words="english")
-    doc_vectors = vectorizer.fit_transform(COPILOT_PLAYBOOK)
-    query_vector = vectorizer.transform([query])
-    sims = cosine_similarity(query_vector, doc_vectors).flatten()
-    ranked_indices = sims.argsort()[::-1][:top_k]
-    return [COPILOT_PLAYBOOK[idx] for idx in ranked_indices]
+def _retrieve_rag_context(query: str, top_k: int = 2):
+    return retrieve_policy(query, top_k)
 
 
 def _build_llm_prompt(row: Dict[str, Any], rag_context: List[str]) -> str:
     student = row["student"]
     factors = row.get("factors") or []
-    context_block = "\n".join(f"- {c}" for c in rag_context)
+    context_block = "\n".join(f"- {c['document']} / {c['section']} v{c['version']} (approved={c['approved']}): {c['text']}" for c in rag_context)
     return (
         "Given the student risk profile and policy context, return ONLY valid JSON with keys: "
         "reason_summary, recommended_intervention, priority.\n\n"
         "Allowed recommended_intervention values: Counseling, Financial Support, Academic Support, Mentorship, Family Outreach.\n"
         "Allowed priority values: Critical, High, Medium.\n\n"
         f"Student ID: {student.id}\n"
-        f"Student Name: {student.name}\n"
-        f"Class: {student.class_name}\n"
+
+
         f"Risk Score: {float(row.get('risk_score') or 0):.1f}\n"
         f"Risk Trend: {row.get('risk_trend') or student.risk_trend or 'stable'}\n"
         f"Detected Factors: {', '.join(factors) if factors else 'none'}\n"
@@ -212,19 +199,14 @@ def _fetch_student_data(db: Session) -> List[Student]:
 def _predict_risk_payload(students: List[Student]) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for student in students:
-        sem_num = int(student.semester.split()[-1]) if "Semester" in student.semester else 4
-        pred = predict_risk(
-            attendance=float(student.attendance or 0),
-            marks=float(student.marks or 0),
-            has_financial_issue=bool(student.has_financial_issue),
-            has_family_issue=bool(student.has_family_issue),
-            semester=sem_num,
-        )
+        pred = student.prediction or {}
+        if pred.get("risk_score") is None:
+            continue
         rows.append({
             "student": student,
             "risk_score": float(pred.get("risk_score") or 0),
             "risk_level": pred.get("risk_level") or "low",
-            "factors": pred.get("risk_factors") or [],
+            "factors": student.risk_factors,
         })
     return rows
 
@@ -375,7 +357,8 @@ async def _run_pipeline(db: Session, run_by: User, run_type: str = "weekly") -> 
             "llm_model": AGENT_LLM_MODEL if llm_enabled else "none",
             "rag_backend": "policy_playbook",
             "vector_backend": "tfidf_cosine",
-            "knowledge_chunks": len(COPILOT_PLAYBOOK),
+            "policy_source": "versioned_local_documents",
+            "requires_staff_review": True,
         },
         created_by=run_by.name,
     )
@@ -384,6 +367,8 @@ async def _run_pipeline(db: Session, run_by: User, run_type: str = "weekly") -> 
 
     for row in state["final_actions"]:
         student: Student = row["student"]
+        if db.query(CopilotActionTicket).filter_by(student_id=student.id, status="Open", recommended_intervention=row["recommended_intervention"]).first():
+            continue
         ticket = CopilotActionTicket(
             run_id=run.id,
             student_id=student.id,
@@ -394,13 +379,16 @@ async def _run_pipeline(db: Session, run_by: User, run_type: str = "weekly") -> 
             reason_summary=row["reason_summary"],
             recommended_intervention=row["recommended_intervention"],
             priority=row["priority"],
+            policy_references=row.get("rag_context", []),
             n8n_status="local_only",
             n8n_reference=None,
             status="Open",
         )
         db.add(ticket)
-        _ensure_intervention_and_timeline(db, row, run_by.name, run_by.id)
+        # Tickets are proposals. Staff explicitly create/accept an intervention.
 
+    db.flush()
+    run.actions_created = db.query(CopilotActionTicket).filter_by(run_id=run.id).count()
     db.commit()
     db.refresh(run)
 

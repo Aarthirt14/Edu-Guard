@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.core.dependencies import get_db, get_current_user
 from app.services.ai_service import chat
+from app.services.auth_service import require_role
+from app.models.user import UserRole
 
 router = APIRouter(prefix="/api/ai", tags=["AI Assistant"])
 
@@ -23,7 +25,7 @@ class ChatResponse(BaseModel):
 def ai_chat(
     req: ChatRequest,
     db: Session = Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(require_role(UserRole.admin, UserRole.counselor)),
 ):
     """
     Send any question about high-risk students or interventions.

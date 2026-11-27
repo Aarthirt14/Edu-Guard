@@ -101,7 +101,8 @@ async function fetchAPI(endpoint, options = {}) {
         window.location.href = "login.html";
       }
     }
-    throw new Error(`API error ${res.status}`);
+    const failure = await res.json().catch(() => ({}));
+    throw new Error(typeof failure.detail === "string" ? failure.detail : `API error ${res.status}`);
   }
   return res.json();
 }
@@ -127,7 +128,7 @@ async function fetchDashboardData(user) {
   }
 
   try {
-    const rawStudents = await fetchAPI('/api/students/high-risk');
+    const rawStudents = user.role === 'student' ? [] : await fetchAPI('/api/students/high-risk');
     highRiskStudents = rawStudents.map(s => ({
       id: s.id,
       name: s.name,
@@ -147,8 +148,13 @@ async function fetchDashboardData(user) {
   }
 
   try {
-    const rawInterventions = await fetchAPI('/api/interventions/');
+    const rawInterventions = user.role === 'student' ? [] : await fetchAPI('/api/interventions/');
     interventions = rawInterventions.map(i => ({
+      id: i.id,
+      dueAt: i.due_at,
+      ownerId: i.owner_id,
+      closureReason: i.closure_reason,
+      followUpObservation: i.follow_up_observation,
       studentId: i.student_id,
       studentName: i.student_name || i.student_id,
       className: i.class_name || "—",
@@ -360,18 +366,19 @@ function renderInterventionsTable() {
       <td>
         <div class="student-info">
           <div class="student-avatar">${getInitials(i.studentName)}</div>
-          <div class="student-name">${i.studentName}</div>
+          <div class="student-name">${escapeHtml(i.studentName)}</div>
         </div>
       </td>
-      <td>${i.type}</td>
-      <td>${i.assignedBy}</td>
-      <td>${i.date}</td>
+      <td>${escapeHtml(i.type)}</td>
+      <td>${escapeHtml(i.assignedBy)}</td>
+      <td>${i.date}<br><small>Due: ${i.dueAt ? escapeHtml(new Date(i.dueAt).toLocaleDateString()) : "Unscheduled"}</small></td>
       <td><span class="badge badge-${i.status.toLowerCase()}">${i.status}</span></td>
       <td>
         <span class="${i.outcome === 'Improving' || i.outcome === 'Improved' ? 'text-cyan' : i.outcome === 'Stable' ? 'text-blue' : 'text-muted'}">${i.outcome}</span>
       </td>
       <td>
         <button class="btn btn-ghost btn-sm" onclick="openTimelineModal('${i.studentId}', '${i.studentName.replace(/'/g, "\\'")}')"><i class="fas fa-history"></i> Timeline</button>
+        <button class="btn btn-ghost btn-sm" onclick="openFollowUp(${Number(i.id)})">Review / follow up</button>
       </td>
     </tr>
   `).join("");
@@ -812,8 +819,8 @@ function renderCopilotTicketsTable() {
         <td>${risk.toFixed(1)}</td>
         <td><span class="badge badge-${priorityCls}">${escapeHtml(t.priority || "Medium")}</span></td>
         <td>${escapeHtml(t.recommended_intervention || "—")}</td>
-        <td style="max-width:320px;">${escapeHtml(cleanReason)}</td>
-        <td>${escapeHtml(t.status || "Open")}</td>
+        <td style="max-width:320px;">${escapeHtml(cleanReason)}<br><small>${(t.policy_references || []).map(p => escapeHtml(`${p.document} / ${p.section} v${p.version} · ${p.approved ? 'Approved policy' : 'Example, not institution-approved'}`)).join('<br>')}</small></td>
+        <td>${escapeHtml(t.status || "Open")}${t.status === 'Open' ? `<br><button class="btn btn-ghost btn-sm" onclick="approveCopilotTicket(${Number(t.id)})">Approve proposal</button>` : ''}</td>
       </tr>
     `;
   }).join("");
@@ -1645,10 +1652,15 @@ function submitStudentHelpRequest() {
 }
 
 async function updateStudentTrendCharts() {
-  const studentId = studentFinancialCase?.student_id || counselingSessions[0]?.student_id || null;
-  if (!studentId) return;
-
+  const user = JSON.parse(localStorage.getItem('eduguard_user') || '{}');
+  if (user.role !== 'student') return;
   try {
+    const profile = await fetchAPI('/api/students/me/profile');
+    const studentId = profile.id;
+    const summary = document.getElementById('studentPredictionSummary');
+    if (summary) summary.textContent = profile.risk_score == null
+      ? 'Not enough recorded data for a score. Your support team can help complete your records.'
+      : `Experimental support score: ${Number(profile.risk_score).toFixed(1)} / 100. This is not a verified dropout probability. ${profile.prediction?.weeks_tracked || 0} weekly records used.`;
     const trend = await fetchAPI(`/api/students/${studentId}/risk-trend`);
     const attendancePoints = Array.isArray(trend.attendance_points) ? trend.attendance_points : [];
     const marksPoints = Array.isArray(trend.marks_points) ? trend.marks_points : [];
@@ -1670,7 +1682,8 @@ async function updateStudentTrendCharts() {
       studentMarksChart.update();
     }
   } catch (e) {
-    // Keep default chart if student trend endpoint is unavailable for this account mapping.
+    const summary = document.getElementById("studentPredictionSummary");
+    if (summary) summary.textContent = "Your recorded prediction is unavailable. Contact your support team.";
   }
 }
 
@@ -1870,6 +1883,22 @@ async function openRiskTrendModal(studentId, studentName) {
     const data = await fetchAPI(`/api/students/${studentId}/risk-trend`);
     if (!data) throw new Error("No data returned");
 
+    const prediction = data.prediction || {};
+    let panel = document.getElementById('predictionEvidence');
+    if (!panel && driversEl) {
+      panel = document.createElement('section');
+      panel.id = 'predictionEvidence';
+      driversEl.parentElement.appendChild(panel);
+    }
+    if (panel) {
+      panel.innerHTML = `<h3>Prediction evidence</h3>
+        <p><strong>${prediction.risk_score == null ? 'Insufficient data' : `${Number(prediction.risk_score).toFixed(1)} / 100`}</strong> · ${escapeHtml(prediction.mode || 'Not scored')}</p>
+        <p>Experimental score trained on synthetic data. It is not a verified dropout probability.</p>
+        <p>${Number(prediction.weeks_tracked || 0)} weekly records · Admission completeness: ${Math.round(Number(prediction.data_completeness || 0) * 100)}%</p>
+        <p>${escapeHtml(prediction.explanation_method || 'Explanations available after scoring')}</p>
+        <ul>${(prediction.explanations || []).map(e => `<li>${escapeHtml(e.feature)}: ${escapeHtml(String(e.value))}; score sensitivity ${Number(e.score_change_points).toFixed(1)} points compared with reference ${escapeHtml(String(e.reference))}</li>`).join('')}</ul>
+        <small>Model: ${escapeHtml(prediction.model_version || '—')} · ${escapeHtml(prediction.scored_at || '')}</small>`;
+    }
     if (attendanceEl) attendanceEl.innerHTML = trendChip(data.attendance_trend);
     if (marksEl) marksEl.innerHTML = trendChip(data.marks_trend);
     if (feeEl) feeEl.innerHTML = trendChip(data.fee_trend);
@@ -2153,6 +2182,7 @@ document.getElementById("sidebarClose")?.addEventListener("click", () => {
 // ===== CHARTS =====
 
 function initCharts() {
+  if (typeof Chart === "undefined") return;
   const compactYAxis = {
     ticks: {
       color: "#6B7280",
@@ -2202,10 +2232,10 @@ function initCharts() {
     studentAttendanceChart = new Chart(attCtx.getContext("2d"), {
       type: "line",
       data: {
-        labels: ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb"],
+        labels: [],
         datasets: [{
           label: "Attendance %",
-          data: [82, 75, 68, 60, 55, 50, 48],
+          data: [],
           borderColor: "#EF4444",
           backgroundColor: "rgba(239,68,68,0.08)",
           fill: true,
@@ -2230,10 +2260,10 @@ function initCharts() {
     studentMarksChart = new Chart(mkCtx.getContext("2d"), {
       type: "line",
       data: {
-        labels: ["IA-1", "IA-2", "IA-3", "Midterm", "IA-4", "IA-5"],
+        labels: [],
         datasets: [{
-          label: "Marks",
-          data: [65, 58, 48, 42, 38, 32],
+          label: "IA marks (out of 40)",
+          data: [],
           borderColor: "#EF4444",
           backgroundColor: "rgba(239,68,68,0.08)",
           fill: true,
@@ -2444,7 +2474,7 @@ function initCharts() {
 function animateRiskCircle() {
   const fill = document.getElementById("riskCircleFill");
   if (!fill) return;
-  const score = 78;
+  const score = Number(fill.dataset.score || 0);
   const circumference = 2 * Math.PI * 90; // r=90
   const offset = circumference - (score / 100) * circumference;
   setTimeout(() => {
@@ -2893,3 +2923,52 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   showPage(targetPage);
 });
+
+
+async function approveCopilotTicket(id) {
+  try {
+    await fetchAPI(`/api/copilot/tickets/${id}/approve`, {method: 'POST'});
+    await openCopilotRun(selectedCopilotRunId);
+    await fetchDashboardData(JSON.parse(localStorage.getItem("eduguard_user")));
+    renderInterventionsTable();
+  } catch (err) { alert(err.message); }
+}
+
+function openFollowUp(id) {
+  const item = interventions.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('followUpId').value = id;
+  document.getElementById('followUpStatus').value = item.status;
+  document.getElementById('followUpObservation').value = item.followUpObservation || '';
+  document.getElementById('followUpClosure').value = item.closureReason || '';
+  document.getElementById('followUpDue').value = item.dueAt ? item.dueAt.slice(0, 16) : '';
+  document.getElementById('followUpOwner').value = item.ownerId || '';
+  document.getElementById('followUpAttendance').value = '';
+  document.getElementById('followUpMarks').value = '';
+  document.getElementById('followUpError').textContent = '';
+  document.getElementById('followUpDialog').showModal();
+}
+
+async function saveFollowUp(event) {
+  event.preventDefault();
+  const id = Number(document.getElementById('followUpId').value);
+  const payload = {
+    status: document.getElementById('followUpStatus').value,
+    follow_up_observation: document.getElementById('followUpObservation').value,
+    closure_reason: document.getElementById('followUpClosure').value,
+  };
+  const due = document.getElementById('followUpDue').value;
+  const owner = document.getElementById('followUpOwner').value.trim();
+  if (due) payload.due_at = new Date(due).toISOString();
+  if (owner) payload.owner_id = owner;
+  for (const [field, element] of [['follow_up_attendance', 'followUpAttendance'], ['follow_up_marks', 'followUpMarks']]) {
+    const value = document.getElementById(element).value;
+    if (value !== '') payload[field] = Number(value);
+  }
+  try {
+    await fetchAPI(`/api/interventions/${id}`, {method: 'PUT', body: JSON.stringify(payload)});
+    document.getElementById('followUpDialog').close();
+    await fetchDashboardData(JSON.parse(localStorage.getItem("eduguard_user")));
+    renderInterventionsTable();
+  } catch (err) { document.getElementById('followUpError').textContent = err.message; }
+}
