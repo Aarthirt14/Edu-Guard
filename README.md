@@ -12,7 +12,8 @@ A final-year research prototype built with FastAPI, scikit-learn, SQLAlchemy and
 4. Staff inspect observed trends and prediction evidence in the Risk Trend dialog.
 5. Copilot reads the saved prediction and creates reviewable proposals with policy references. Repeated runs do not duplicate open proposals. Approval creates a pending intervention; it does not send external notifications.
 6. Staff record an owner, due date, acceptance and follow-up evidence. Completion requires observations and a closure reason. Follow-up measurements remain separate from model inputs.
-7. Evaluation compares attendance rules, admission-only, weekly-only and combined models on the same held-out cohort.
+7. Students submit persisted help requests. Admins/counselors read and reply in the support inbox; students see the conversation and resolution status.
+8. Evaluation compares attendance rules, admission-only, weekly-only and combined models on the same held-out cohort.
 
 ## Local setup
 
@@ -36,7 +37,7 @@ python -m http.server 5500
 
 Open http://localhost:5500/dashboard.html. API documentation: http://localhost:8000/docs.
 
-First startup generates synthetic training data and trains versioned demo models; this can take a minute. Generated CSVs, databases and models are ignored by git. Startup preserves existing records and backfills missing v3 predictions without reseeding or deleting them.
+First startup generates synthetic training data and trains versioned demo models; this can take a minute. Generated CSVs, databases and models are ignored by git. Startup preserves existing records and backfills missing v4 predictions without reseeding or deleting them.
 
 `DEMO_MODE=true` (default) seeds demonstration accounts and synthetic weekly observations **only in an empty database**. Set `DEMO_MODE=false` to disable demo seeding; provision staff accounts separately. Existing demo accounts are not automatically removed. Use a separate database for authorised institutional data and set a strong `SECRET_KEY`.
 
@@ -96,3 +97,26 @@ See [evaluation protocol](docs/EVALUATION.md) for the dataset contract, research
 - `tests/`: API isolation, prediction consistency, upload rollback and workflow tests.
 
 SQLite is supported for the local prototype. Existing SQLite schemas receive additive columns; back up the database before upgrading. A production database migration, real-data validation, probability calibration, independent fairness review and institutional approval remain deployment prerequisites.
+
+## Paired model training and current delivery status
+
+Both v4 models train on the same student snapshots and binary outcome: `withdrawal_within_90_days_of_scoring`. They share a dataset fingerprint, cohort split and 90-day prediction horizon. The admission-feature model and weekly-feature model are two views of the same target. Scores remain uncalibrated; the bundled data is synthetic.
+
+```bash
+cd backend
+python -m app.ml.train_models --data authorised_snapshots.csv --output candidate-models
+```
+
+Observed-data training requires `observed_at`, `followup_until`, `outcome_at`, `outcome_definition`, and `prediction_horizon_days` in addition to the evaluation feature columns. Negative outcomes require complete 90-day follow-up; positive withdrawal dates must fall inside that window. Candidate artifacts do not automatically replace the running models.
+
+New admissions have `null` attendance and marks until recorded. Historical values of 100 cannot be distinguished automatically from genuine perfect scores; verify legacy imports before reuse.
+
+Email/SMS delivery and scheduled suggestions are explicitly unavailable, disabled in the UI and rejected by the API if enabled. Copilot is manually run; support conversations are delivered through the portal. No external messages are sent.
+
+Run frontend interaction checks from the repository root:
+
+```bash
+node frontend/tests/workflows.cjs
+```
+
+These execute the actual upload/request functions with mocked browser/network adapters. They check marks scale, original weeks, configured production URLs, failure handling and server-confirmed support requests; they are not visual browser tests.

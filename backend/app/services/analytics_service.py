@@ -57,8 +57,8 @@ def get_analytics(db: Session, threshold: int = 70) -> AnalyticsResponse:
     # Factor distribution
     students = db.query(Student).filter(Student.risk_score >= threshold).all()
     fin = sum(1 for s in students if s.has_financial_issue)
-    att = sum(1 for s in students if s.attendance < 60)
-    acad = sum(1 for s in students if s.marks < 40)
+    att = sum(1 for s in students if s.attendance is not None and s.attendance < 60)
+    acad = sum(1 for s in students if s.marks is not None and s.marks < 40)
     fam = sum(1 for s in students if s.has_family_issue)
 
     # Intervention outcomes

@@ -126,8 +126,8 @@ def _heuristic_financial_ai(case: FinancialSupportCase, db: Optional[Session] = 
 
     if student is not None:
         risk_score = float(student.risk_score or 0)
-        attendance = float(student.attendance or 0)
-        marks = float(student.marks or 0)
+        attendance = student.attendance
+        marks = student.marks
 
         if risk_score >= 85:
             summary_signals.append(f"critical dropout risk ({risk_score:.1f})")
@@ -136,9 +136,9 @@ def _heuristic_financial_ai(case: FinancialSupportCase, db: Optional[Session] = 
             summary_signals.append(f"high dropout risk ({risk_score:.1f})")
             actions.append("Set a weekly financial-risk review cadence until risk drops below 70.")
 
-        if attendance < 65:
+        if attendance is not None and attendance < 65:
             actions.append("Link financial plan milestones with attendance recovery check-ins to reduce immediate dropout risk.")
-        if marks < 45:
+        if marks is not None and marks < 45:
             actions.append("Coordinate with academic support mentor while financial plan is active to stabilize performance.")
 
         if db is not None:
@@ -198,8 +198,8 @@ def _llm_financial_ai(
         "student_name": student.name if student else None,
         "class_name": student.class_name if student else None,
         "risk_score": float(student.risk_score or 0) if student else None,
-        "attendance": float(student.attendance or 0) if student else None,
-        "marks": float(student.marks or 0) if student else None,
+        "attendance": student.attendance if student else None,
+        "marks": student.marks if student else None,
         "fee_outstanding_amount": case.fee_outstanding_amount,
         "scholarship_eligibility": case.scholarship_eligibility,
         "social_category": case.social_category,

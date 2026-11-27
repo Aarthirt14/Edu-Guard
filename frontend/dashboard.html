@@ -556,7 +556,7 @@
                   <div class="risk-label">Support</div>
                 </div>
               </div>
-              <h3 style="color:var(--accent-secondary);margin-bottom:8px;font-size:20px;">Support Plan Available</h3>
+              <h3 style="color:var(--accent-secondary);margin-bottom:8px;font-size:20px;">Your Support Overview</h3>
               <p class="risk-explanation">
                 Your support team is monitoring your progress and has enabled personalized assistance for attendance,
                 academics, counseling, and fee planning. Check the sections below for active updates and next steps.
@@ -580,7 +580,7 @@
           <div class="support-card">
             <div class="support-icon cyan"><i class="fas fa-book"></i></div>
             <h4>Academic Support</h4>
-            <p id="studentSupportAcademic">Learning plan · <span class="text-cyan">In Progress</span></p>
+            <p id="studentSupportAcademic">No academic plan recorded</p>
           </div>
         </div>
 
@@ -1310,29 +1310,20 @@
           </div>
           <div class="card">
             <div class="card-header">
-              <h3>Notification Preferences</h3>
+              <h3>Notification Preferences</h3><p>Email, SMS and scheduled suggestions are unavailable. Use the support inbox for messages and run Copilot manually.</p>
             </div>
             <div class="card-body">
               <div class="form-group">
                 <label>Email Notifications</label>
-                <select id="emailNotifications">
-                  <option value="Enabled">Enabled</option>
-                  <option value="Disabled">Disabled</option>
-                </select>
+                <select id="emailNotifications" disabled><option value="Disabled">Unavailable</option></select>
               </div>
               <div class="form-group">
                 <label>SMS Alerts for Critical Students</label>
-                <select id="smsAlerts">
-                  <option value="Enabled">Enabled</option>
-                  <option value="Disabled">Disabled</option>
-                </select>
+                <select id="smsAlerts" disabled><option value="Disabled">Unavailable</option></select>
               </div>
               <div class="form-group">
                 <label>AI Auto-Intervention Suggestions</label>
-                <select id="aiSuggestions">
-                  <option value="Enabled">Enabled</option>
-                  <option value="Disabled">Disabled</option>
-                </select>
+                <select id="aiSuggestions" disabled><option value="Disabled">Unavailable</option></select>
               </div>
               <button class="btn btn-primary mt-1" onclick="savePreferences()"><i class="fas fa-save"></i> Save Preferences</button>
             </div>
@@ -1594,6 +1585,12 @@
   </form>
 </dialog>
 <style>#followUpDialog::backdrop{background:#0009}#followUpDialog label{display:block;margin:12px 0}#followUpDialog input,#followUpDialog textarea,#followUpDialog select{display:block;width:100%;padding:8px;background:#0c192b;color:white;border:1px solid #42607c;border-radius:5px}#followUpError{color:#ffb1a6}</style>
+<dialog id="supportReplyDialog" style="width:min(520px,90vw);padding:24px;background:#142338;color:white;border-radius:12px">
+<form onsubmit="saveSupportReply(event)"><h2>Support reply</h2><input id="supportReplyId" type="hidden">
+<textarea id="supportReplyMessage" required maxlength="4000" rows="5" style="width:100%" aria-label="Reply message"></textarea>
+<select id="supportReplyStatus" aria-label="Request status"><option>In Progress</option><option>Resolved</option><option>Open</option></select>
+<p id="supportReplyError" role="alert"></p><button class="btn btn-primary" type="submit">Save reply</button>
+<button class="btn btn-ghost" type="button" onclick="document.getElementById('supportReplyDialog').close()">Cancel</button></form></dialog>
 </body>
 
 </html>

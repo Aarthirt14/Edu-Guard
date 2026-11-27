@@ -11,8 +11,8 @@ class StudentBase(BaseModel):
     email: Optional[str] = None
     class_name: str
     semester: str
-    attendance: float = Field(ge=0, le=100)
-    marks: float = Field(ge=0, le=100)
+    attendance: Optional[float] = Field(None, ge=0, le=100)
+    marks: Optional[float] = Field(None, ge=0, le=100)
     has_financial_issue: bool = False
     has_family_issue: bool = False
 

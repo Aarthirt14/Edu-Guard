@@ -8,7 +8,7 @@ Use anonymised authorised historical records with a documented outcome definitio
 
 - Admission: Family_Income, Scholarship, Education_Loan, Father_Occupation, Mother_Occupation, Parent_Education, Home_Location, HighSchool_Grade.
 - Weekly: att_current, att_avg_4w, att_total_drop, att_slope, ia_latest, ia_avg, has_ia_data, backlog_current, backlog_growing, fee_outstanding, weeks_tracked.
-- Optional: observed_at and outcome_at (both supplied together); audit_group for subgroup error reporting.
+- Required for observed data: observed_at, followup_until, outcome_at (blank for no withdrawal), outcome_definition=`withdrawal_within_90_days_of_scoring`, prediction_horizon_days=90. Optional audit_group enables subgroup reporting.
 
 IA features are out of 40. Attendance and school grade are percentages. Features must reflect only information available at prediction time. Do not include future marks, future attendance or outcome-derived fields. Distinguish graduation, transfer and confirmed withdrawal in the source data; define which outcome is being studied before producing the binary label. A currently enrolled student without completed follow-up is not automatically a negative outcome.
 
@@ -24,7 +24,7 @@ The original scheduled blend is reported alongside the validation-selected blend
 
 The checked-in `synthetic-evaluation.json` records a reproducible 1,200-student simulation with 400 students in each split. It tests the evaluation machinery only. Simulated admission attributes are independently sampled from weekly trajectories, so it does not provide a realistic test of the added value of admission information. Both models are trained against the same simulated outcome for this comparison.
 
-The original live demonstration models still use separate rule-generated label recipes; their weighted output is an experimental risk index, not a coherent calibrated probability. Real deployment requires retraining both against the same observed outcome and time horizon.
+The v4 live demonstration models now train on the same paired dataset and shared synthetic outcome, with a declared 90-day horizon and identical provenance metadata. No synthetic simulation establishes real-world validity or probability calibration. Observed-data training validates outcome timing and requires full follow-up for negative labels.
 
 ## Still requiring evidence
 

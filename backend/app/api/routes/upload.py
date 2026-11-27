@@ -80,7 +80,7 @@ async def upload_admission_data(file: UploadFile = File(...), db=Depends(get_db)
                 profile = {attr: row.get(key) or None for key, attr in EARLY_FIELDS.items()}
                 # Missing fields remain missing; no invented family background.
                 profile["admission_quota"] = row.get("Admission_Quota") or None
-                data = StudentCreate(id=sid, name=row["name"], class_name=row["class_name"], semester=row["semester"], attendance=100, marks=100, **profile)
+                data = StudentCreate(id=sid, name=row["name"], class_name=row["class_name"], semester=row["semester"], attendance=None, marks=None, **profile)
                 student = Student(**data.model_dump(), risk_trend="stable")
                 db.add(student)
                 db.flush()

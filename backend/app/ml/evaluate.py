@@ -37,7 +37,7 @@ def split_cohorts(df):
     if "observed_at" in df and "outcome_at" in df:
         observation = pd.to_datetime(df.observed_at, errors="raise", utc=True)
         outcome = pd.to_datetime(df.outcome_at, errors="raise", utc=True)
-        if observation.isna().any() or outcome.isna().any() or (observation >= outcome).any():
+        if observation.isna().any() or (outcome.notna() & (observation >= outcome)).any():
             raise ValueError("Features must be observed strictly before the outcome date")
     return parts
 
@@ -128,6 +128,9 @@ def main():
     if bool(args.data) == args.synthetic:
         parser.error("Choose exactly one: --data authorised.csv OR --synthetic")
     df = synthetic_demo() if args.synthetic else pd.read_csv(args.data)
+    if args.data:
+        from app.ml.train_models import validate_outcomes
+        validate_outcomes(df)
     report = evaluate(df, args.output, "synthetic" if args.synthetic else "user_supplied_observed_outcomes")
     print(json.dumps({"validation_status": report["validation_status"], "selected_blend": report["selected_blend"], "results": report["results"]}, indent=2))
 

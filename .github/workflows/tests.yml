@@ -14,3 +14,5 @@ jobs:
       - run: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests -q
         working-directory: backend
       - run: node --check frontend/app.js
+
+      - run: node frontend/tests/workflows.cjs

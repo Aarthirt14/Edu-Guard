@@ -9,16 +9,16 @@ def generate_academic_support_note(db, student: Student, intervention: Intervent
     try:
         trend = get_risk_trend_factors(db, student.id)
         drivers = trend.get("drivers") or []
-        attendance = float(student.attendance or 0)
-        marks = float(student.marks or 0)
+        attendance = student.attendance
+        marks = student.marks
         risk_score = float(student.risk_score or 0)
         trend_value = (student.risk_trend or "stable").lower()
         factors = [str(f).lower() for f in (student.risk_factors or [])]
 
         actions = []
-        if marks < 45 or "academic" in factors:
+        if (marks is not None and marks < 45) or "academic" in factors:
             actions.append("Run subject-wise remediation this week and conduct a 10-mark checkpoint test in 7 days")
-        if attendance < 75 or "attendance" in factors:
+        if (attendance is not None and attendance < 75) or "attendance" in factors:
             actions.append("Start attendance recovery with daily class check-in and end-of-week parent update")
         if risk_score >= 85 or trend_value == "up":
             actions.append("Schedule one-to-one mentoring within 48 hours and review progress in the next weekly meeting")

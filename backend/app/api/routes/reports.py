@@ -40,7 +40,7 @@ def _make_pdf_high_risk(students) -> BytesIO:
         data.append([
             s.id, s.name, s.class_name, s.semester,
             f"{s.risk_score:.0f}",
-            f"{s.attendance:.0f}%",
+            f"{s.attendance:.0f}%" if s.attendance is not None else "Not recorded",
             ", ".join(s.risk_factors),
         ])
 

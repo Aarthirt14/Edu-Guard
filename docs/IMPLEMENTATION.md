@@ -30,8 +30,14 @@ Copilot proposals require staff approval and do not send email, Slack, n8n or gu
 
 ## Verification performed
 
-- 19 automated regression checks pass, including student isolation, faculty scope, marks normalisation, sparse-week slope calculation, upload idempotency and rollback, abstention, staff approval, ticket deduplication, follow-up closure and cohort splitting.
+- 23 automated regression checks pass, including student isolation, faculty scope, marks normalisation, sparse-week slope calculation, upload idempotency and rollback, abstention, staff approval, ticket deduplication, follow-up closure and cohort splitting.
 - Actual demo model training, startup, login, student prediction, intervention listing, analytics and Copilot API smoke checks passed.
 - Synthetic cohort evaluation completed; results are in `synthetic-evaluation.json`.
 - JavaScript syntax and Python compilation checks passed; pip reported no broken requirements.
 - Visual browser verification could not run: the installed Chromium launcher has no binary and the browser download was blocked. Review the Risk Trend evidence panel, Copilot approval button and follow-up dialog in a browser before merging/deploying.
+
+## Connected journey verification
+
+The complete API journey test uses actual password authentication and actual v4 model inference: admin admission import → student account provisioning → faculty weekly upload → student prediction → student help request → counselor reply → intervention acceptance → observed follow-up → completion → Excel/PDF export. It checks peer/student restrictions, rejected login and incomplete closure. Frontend interaction checks verify the configured deployed URL, preservation of IA_Max and row week, upload error handling, and request text retention after a network failure. Requests are visible to the student and admin/counselor support staff; faculty cannot read private conversations.
+
+Notification delivery is explicitly unavailable. Scheduled suggestions are disabled; Copilot remains manual. Historical imported marks with unknown scale or default 100 values still require verification. The legacy shared-password account provisioning flow remains suitable only for demonstrations; individual account onboarding is needed before real deployment.

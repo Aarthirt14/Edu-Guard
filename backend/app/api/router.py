@@ -17,3 +17,6 @@ api_router.include_router(users.router)
 api_router.include_router(financial_support.router)
 api_router.include_router(counseling.router)
 api_router.include_router(copilot.router)
+
+from app.api.routes import support
+api_router.include_router(support.router)

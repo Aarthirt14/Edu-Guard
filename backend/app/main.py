@@ -79,9 +79,9 @@ app = FastAPI(
 REST API powering the EduGuard student dropout prediction dashboard.
 
 ### Dual ML Model Architecture
-- **Model 1 (Early Risk)**: RandomForest trained on static admission data (10,000 rows)
-  - Runs once at admission — `baseline_risk_score` stored permanently
-- **Model 2 (Dynamic Risk)**: GradientBoosting trained on weekly engineered features (10,000 rows)
+- **Model 1 (Early Risk)**: RandomForest using admission features from the shared paired dataset
+  - Targets withdrawal within 90 days of scoring; synthetic demonstration only
+- **Model 2 (Dynamic Risk)**: GradientBoosting using weekly features from the same paired dataset
   - Re-runs every week using attendance slope, IA trends, backlog growth
 
 ### Blended Score Formula

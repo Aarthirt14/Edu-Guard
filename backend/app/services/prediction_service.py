@@ -12,7 +12,7 @@ from app.models.student import Student, WeeklyRecord, RiskHistory
 from app.ml.model import blend_scores
 from app.ml.train_models import load_early_model, load_dynamic_model
 
-VERSION = "eduguard-v3"
+VERSION = "eduguard-v4"
 EARLY_FIELDS = {
     "Family_Income": "family_income", "Scholarship": "scholarship",
     "Education_Loan": "education_loan", "Father_Occupation": "father_occupation",
@@ -83,13 +83,16 @@ def predict_student(db, student):
     explanations.sort(key=lambda x: abs(x["score_change_points"]), reverse=True)
     inputs = {"admission": early_features, "weekly": features}
     fingerprint = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()[:16]
+    metadata = getattr(dynamic_model if dynamic_model is not None else early_model, "eduguard_metadata", {})
     result = {
         "risk_score": round(total, 1) if total is not None else None,
         "risk_level": "unknown" if total is None else ("high" if total >= 70 else "medium" if total >= 40 else "low"),
         "baseline_risk_score": round(early, 1) if early is not None else None,
         "dynamic_risk_score": round(dynamic, 1) if dynamic is not None else None,
         "mode": mode, "weeks_tracked": weeks_tracked, "input_fingerprint": fingerprint,
-        "model_version": VERSION, "validation_status": "synthetic_demo_not_real_world_validated",
+        "model_version": VERSION, "model_provenance": metadata,
+        "outcome_definition": "withdrawal_within_90_days_of_scoring", "prediction_horizon_days": 90,
+        "validation_status": metadata.get("validation_status", "synthetic_demo_not_real_world_validated"),
         "score_meaning": "Uncalibrated model score; not a confirmed dropout probability",
         "missing_admission_fields": missing,
         "data_completeness": round((len(EARLY_FIELDS) - len(missing)) / len(EARLY_FIELDS), 2),
@@ -112,7 +115,7 @@ def refresh_prediction(db, student):
     student.risk_trend = "stable" if previous is None or student.risk_score is None or previous == student.risk_score else "up" if student.risk_score > previous else "down"
     old = student.prediction or {}
     # Identical uploads must not generate duplicate risk-history entries.
-    if old.get("input_fingerprint") != result["input_fingerprint"] or old.get("model_version") != VERSION:
+    if old.get("input_fingerprint") != result["input_fingerprint"] or old.get("model_version") != VERSION or old.get("model_provenance") != result.get("model_provenance"):
         student.prediction = result
         if student.risk_score is not None:
             db.add(RiskHistory(student_id=student.id, risk_score=student.risk_score, prediction=result))

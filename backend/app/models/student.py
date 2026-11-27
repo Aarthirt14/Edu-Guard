@@ -17,8 +17,8 @@ class Student(Base):
     semester = Column(String, nullable=False)                    # "Semester 4"
 
     # --- Legacy simple fields (kept for backward compat) ---
-    attendance = Column(Float, default=100.0)
-    marks = Column(Float, default=100.0)
+    attendance = Column(Float, nullable=True)
+    marks = Column(Float, nullable=True)
     has_financial_issue = Column(Boolean, default=False)
     has_family_issue = Column(Boolean, default=False)
 
@@ -59,9 +59,9 @@ class Student(Base):
         factors = []
         if self.has_financial_issue or (self.family_income and self.family_income < 20000):
             factors.append("financial")
-        if self.attendance < 60:
+        if self.attendance is not None and self.attendance < 60:
             factors.append("attendance")
-        if self.marks < 40:
+        if self.marks is not None and self.marks < 40:
             factors.append("academic")
         if self.has_family_issue:
             factors.append("family")

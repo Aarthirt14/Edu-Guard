@@ -136,8 +136,8 @@ async function fetchDashboardData(user) {
       semester: s.semester,
       riskScore: s.risk_score,
       trend: s.risk_trend || "up",
-      attendance: s.attendance || 0,
-      marks: s.marks || 0,
+      attendance: s.attendance ?? null,
+      marks: s.marks ?? null,
       factors: s.risk_factors || [],
       intervention: "None",
       counselor: null
@@ -404,8 +404,8 @@ async function applyHighRiskFilters() {
       semester: s.semester,
       riskScore: s.risk_score,
       trend: s.risk_trend || "up",
-      attendance: s.attendance || 0,
-      marks: s.marks || 0,
+      attendance: s.attendance ?? null,
+      marks: s.marks ?? null,
       factors: s.risk_factors || [],
       intervention: "None",
       counselor: null
@@ -540,9 +540,9 @@ async function saveThresholds() {
 
 async function savePreferences() {
   const payload = {
-    email_notifications: (document.getElementById("emailNotifications")?.value || "Enabled") === "Enabled",
-    sms_alerts: (document.getElementById("smsAlerts")?.value || "Enabled") === "Enabled",
-    ai_auto_suggestions: (document.getElementById("aiSuggestions")?.value || "Enabled") === "Enabled",
+    email_notifications: false,
+    sms_alerts: false,
+    ai_auto_suggestions: false,
   };
 
   try {
@@ -1087,8 +1087,8 @@ function renderFacultyTable() {
           </div>
         </div>
       </td>
-      <td><span class="text-danger" style="font-weight:600;">${s.attendance}%</span></td>
-      <td><span class="text-danger" style="font-weight:600;">${s.marks}/100</span></td>
+      <td><span class="text-danger" style="font-weight:600;">${s.attendance == null ? "Not recorded" : `${s.attendance}%`}</span></td>
+      <td><span class="text-danger" style="font-weight:600;">${s.marks == null ? "Not recorded" : `${s.marks}/100`}</span></td>
       <td>
         <span class="risk-score">
           ${s.riskScore}
@@ -1226,8 +1226,8 @@ function updateFacultyStats(classStudents, assignedClass) {
   if (classNameEl) classNameEl.textContent = assignedClass || "Assigned Class";
 
   const highRiskCount = classStudents.length;
-  const attendanceDropCount = classStudents.filter(s => Number(s.attendance || 0) < 60).length;
-  const marksDropCount = classStudents.filter(s => Number(s.marks || 0) < 40).length;
+  const attendanceDropCount = classStudents.filter(s => s.attendance != null && Number(s.attendance) < 60).length;
+  const marksDropCount = classStudents.filter(s => s.marks != null && Number(s.marks) < 40).length;
   const immediateCount = classStudents.filter(s => Number(s.riskScore || 0) >= 85 && s.intervention === "None").length;
 
   if (highRiskEl) highRiskEl.textContent = highRiskCount;
@@ -1541,7 +1541,7 @@ function renderStudentSupportCards() {
     const activeCounseling = counselingSessions.some(s => String(s.status || "").toLowerCase() === "active");
     academicEl.innerHTML = activeCounseling
       ? `Follow-up with faculty · <span class="text-cyan">Scheduled</span>`
-      : `Learning plan · <span class="text-cyan">In Progress</span>`;
+      : `No academic plan recorded`;
   }
 }
 
@@ -1602,53 +1602,68 @@ function renderStudentActionPlanAndTimeline() {
   }
 }
 
-function renderStudentHelpRequests() {
-  const container = document.getElementById("studentHelpRequestList");
-  if (!container) return;
+let supportRequests = [];
+let supportSubmissionKey = null;
 
-  const raw = localStorage.getItem("eduguard_student_help_requests");
-  const rows = raw ? JSON.parse(raw) : [];
-
-  if (!rows.length) {
-    container.innerHTML = '<div class="text-muted">No help requests submitted yet.</div>';
-    return;
+async function renderStudentHelpRequests() {
+  const user = getCurrentUser();
+  if (!user || !['student', 'admin', 'counselor'].includes(user.role)) return;
+  let container = document.getElementById('studentHelpRequestList');
+  if (user.role !== 'student') {
+    container = document.getElementById('staffSupportInbox');
+    if (!container) {
+      const card = document.createElement('section');
+      card.className = 'card mb-3';
+      card.innerHTML = '<div class="card-header"><h3>Student support inbox</h3><button class="btn btn-ghost" onclick="renderStudentHelpRequests()">Refresh</button></div><div class="card-body" id="staffSupportInbox"></div>';
+      document.getElementById(user.role === 'admin' ? 'page-dashboard' : 'page-counselor').appendChild(card);
+      container = card.querySelector('#staffSupportInbox');
+    }
   }
-
-  container.innerHTML = rows.slice(0, 6).map(r => `
-    <div style="padding:8px 0;border-bottom:1px solid var(--border-color);">
-      <div style="font-weight:600;">${escapeHtml(r.category)}</div>
-      <div class="text-muted" style="font-size:12px;">${escapeHtml(r.time)}</div>
-      <div style="font-size:13px;margin-top:4px;">${escapeHtml(r.message)}</div>
-    </div>
-  `).join("");
+  try {
+    supportRequests = await fetchAPI('/api/support/requests');
+    container.innerHTML = supportRequests.map(r => `<article style="padding:12px;border-bottom:1px solid var(--border-color)">
+      <strong>#${Number(r.id)} · ${escapeHtml(r.category)} · ${escapeHtml(r.status)}</strong>
+      <div>${escapeHtml(r.student_id)} · ${escapeHtml(new Date(r.created_at).toLocaleString())}</div>
+      <p>${escapeHtml(r.message)}</p>
+      ${(r.replies || []).map(reply => `<p><strong>${escapeHtml(reply.author_name)} (${escapeHtml(reply.author_role)})</strong>: ${escapeHtml(reply.message)}</p>`).join('')}
+      <button class="btn btn-ghost" onclick="openSupportReply(${Number(r.id)})">Reply / review</button>
+    </article>`).join('') || '<p>No support requests yet.</p>';
+  } catch (error) { container.textContent = 'Unable to load support requests. ' + error.message; }
 }
 
-function submitStudentHelpRequest() {
-  const category = document.getElementById("studentHelpCategory")?.value?.trim();
-  const message = document.getElementById("studentHelpMessage")?.value?.trim();
+async function submitStudentHelpRequest() {
+  const category = document.getElementById('studentHelpCategory').value;
+  const message = document.getElementById('studentHelpMessage').value.trim();
+  if (!category || !message) { alert('Select a category and enter your message.'); return; }
+  supportSubmissionKey ||= crypto.randomUUID();
+  try {
+    await fetchAPI('/api/support/requests', {method: 'POST', body: JSON.stringify({category, message, submission_key: supportSubmissionKey})});
+    supportSubmissionKey = null;
+    document.getElementById('studentHelpMessage').value = '';
+    await renderStudentHelpRequests();
+    alert('Your request was saved to the support inbox. Replies will appear here.');
+  } catch (error) { alert('Request not confirmed as saved: ' + error.message + '. Your message remains here so you can retry.'); }
+}
 
-  if (!category || !message) {
-    alert("Please select category and enter your message.");
-    return;
-  }
+function openSupportReply(id) {
+  document.getElementById('supportReplyId').value = id;
+  document.getElementById('supportReplyMessage').value = '';
+  document.getElementById('supportReplyError').textContent = '';
+  document.getElementById('supportReplyStatus').hidden = getCurrentUser().role === 'student';
+  document.getElementById('supportReplyStatus').value = 'In Progress';
+  document.getElementById('supportReplyDialog').showModal();
+}
 
-  const raw = localStorage.getItem("eduguard_student_help_requests");
-  const rows = raw ? JSON.parse(raw) : [];
-  rows.unshift({
-    category,
-    message,
-    time: new Date().toLocaleString(),
-  });
-
-  localStorage.setItem("eduguard_student_help_requests", JSON.stringify(rows.slice(0, 20)));
-
-  const categoryEl = document.getElementById("studentHelpCategory");
-  const messageEl = document.getElementById("studentHelpMessage");
-  if (categoryEl) categoryEl.value = "";
-  if (messageEl) messageEl.value = "";
-
-  renderStudentHelpRequests();
-  alert("Help request submitted. Your support team will review it.");
+async function saveSupportReply(event) {
+  event.preventDefault();
+  const id = Number(document.getElementById('supportReplyId').value);
+  const payload = {message: document.getElementById('supportReplyMessage').value};
+  if (getCurrentUser().role !== 'student') payload.status = document.getElementById('supportReplyStatus').value;
+  try {
+    await fetchAPI(`/api/support/requests/${id}/replies`, {method: 'POST', body: JSON.stringify(payload)});
+    document.getElementById('supportReplyDialog').close();
+    await renderStudentHelpRequests();
+  } catch (error) { document.getElementById('supportReplyError').textContent = error.message; }
 }
 
 async function updateStudentTrendCharts() {
@@ -1978,7 +1993,8 @@ function getCurrentUser() {
 
 function enforceAuth() {
   const user = getCurrentUser();
-  if (!user) {
+  if (!user || user.source !== "backend" || !localStorage.getItem("eduguard_token")) {
+    localStorage.removeItem("eduguard_user");
     window.location.href = "login.html";
     return null;
   }
@@ -2122,45 +2138,20 @@ function toggleAIChat() {
   document.getElementById("aiChatPanel").classList.toggle("active", aiChatOpen);
 }
 
-const aiResponses = [
-  "Based on current data, <strong>5 new students</strong> have been flagged as high risk this week. The primary contributing factors are declining attendance and pending tuition fees.",
-  "I recommend immediate <strong>counseling intervention</strong> for Rahul Verma (Risk: 92). His attendance has dropped below 50% and he has outstanding financial dues.",
-  "The <strong>risk factor analysis</strong> shows that 62% of high-risk students have financial difficulties, followed by 54% with attendance issues. Combining interventions typically improves outcomes by 40%.",
-  "Student <strong>Priya Singh</strong> is showing escalating risk trends. Her score rose from 78 to 88 in the last 2 weeks. Family outreach has been suggested as an intervention.",
-  "The <strong>intervention success rate</strong> is currently at 67%. Students who receive counseling within 7 days of being flagged show 2.3x better outcomes.",
-  "I've analyzed the latest batch of data. <strong>Anita Desai</strong> needs immediate attention — she has 3 concurrent risk factors and no intervention assigned yet.",
-];
-
-let aiResponseIndex = 0;
-
-function sendAIMessage() {
-  const input = document.getElementById("aiChatInput");
-  const msg = input.value.trim();
-  if (!msg) return;
-
-  const body = document.getElementById("aiChatBody");
-
-  // User message
-  body.innerHTML += `<div class="chat-msg user">${escapeHtml(msg)}</div>`;
-  input.value = "";
-
-  // Typing indicator
-  body.innerHTML += `<div class="chat-msg ai" id="typing" style="opacity:0.6;">
-    <i class="fas fa-circle-notch fa-spin"></i> Analyzing...
-  </div>`;
+async function sendAIMessage() {
+  const input = document.getElementById('aiChatInput');
+  const message = input.value.trim();
+  if (!message) return;
+  const body = document.getElementById('aiChatBody');
+  body.innerHTML += `<div class="chat-msg user">${escapeHtml(message)}</div>`;
+  input.value = '';
+  try {
+    const data = await fetchAPI('/api/analytics/ai-chat', {method:'POST', body:JSON.stringify({message})});
+    body.innerHTML += `<div class="chat-msg ai">${escapeHtml(data.reply)}</div>`;
+  } catch (error) {
+    body.innerHTML += `<div class="chat-msg ai">Assistant unavailable: ${escapeHtml(error.message)}. Students can use Ask for Help to reach staff.</div>`;
+  }
   body.scrollTop = body.scrollHeight;
-
-  // AI response after delay
-  setTimeout(() => {
-    const typing = document.getElementById("typing");
-    if (typing) typing.remove();
-
-    const response = aiResponses[aiResponseIndex % aiResponses.length];
-    aiResponseIndex++;
-
-    body.innerHTML += `<div class="chat-msg ai">${response}</div>`;
-    body.scrollTop = body.scrollHeight;
-  }, 1200);
 }
 
 function escapeHtml(text) {
@@ -2489,7 +2480,7 @@ let uploadCurrentType = "admission"; // "admission" or "weekly"
 let facultyWeeklyUploadFile = null;
 
 const ADMISSION_COLS = ["id", "name", "class_name", "semester", "Family_Income", "Scholarship", "Education_Loan", "Father_Occupation", "Mother_Occupation", "Parent_Education", "Home_Location", "HighSchool_Grade", "Admission_Quota"];
-const WEEKLY_COLS = ["Student_ID", "Week_Number", "Attendance_Percentage", "IA_Marks", "Semester_Marks", "Backlog_Count", "Fee_Outstanding"];
+const WEEKLY_COLS = ["Student_ID", "Week_Number", "Attendance_Percentage", "IA_Marks", "IA_Max", "Semester_Marks", "Backlog_Count", "Fee_Outstanding"];
 
 function initializeFacultyWeekDropdown() {
   const select = document.getElementById("facultyWeekSelect");
@@ -2550,9 +2541,10 @@ function buildWeeklyCsvForWeek(rows, selectedWeek) {
   const normalizedRows = rows.map(row => {
     const normalized = { ...row };
     if (!normalized.Student_ID && normalized.id) normalized.Student_ID = normalized.id;
-    normalized.Week_Number = String(selectedWeek);
+    if (normalized.Week_Number === undefined || normalized.Week_Number === "") normalized.Week_Number = String(selectedWeek);
+    if (normalized.IA_Max === undefined || normalized.IA_Max === "") normalized.IA_Max = "40";
     if (normalized.Fee_Outstanding === undefined || normalized.Fee_Outstanding === null || normalized.Fee_Outstanding === "") {
-      normalized.Fee_Outstanding = "No";
+      throw new Error("Fee_Outstanding is required; unknown is not the same as No.");
     }
     return normalized;
   });
@@ -2606,7 +2598,7 @@ async function submitFacultyWeeklyUpload() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("http://127.0.0.1:8000/api/upload/weekly", {
+    const res = await fetch(`${window.EDU_GUARD_API_URL || API_BASE_URL}/api/upload/weekly`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: formData,
@@ -2618,7 +2610,7 @@ async function submitFacultyWeeklyUpload() {
     }
 
     const result = await res.json();
-    alert(`Weekly upload complete: Created ${result.created}, Updated/Skipped ${result.skipped}, Errors ${result.errors?.length || 0}`);
+    alert(`Weekly upload complete: Created ${result.created}, Updated ${result.updated || 0}, Skipped ${result.skipped}, Errors ${result.errors?.length || 0}`);
     closeModal("uploadModal");
 
     const user = getCurrentUser();
@@ -2793,8 +2785,8 @@ async function submitUploadData() {
 
   // Pick endpoint based on current tab
   const endpoint = uploadCurrentType === "weekly"
-    ? "http://127.0.0.1:8000/api/upload/weekly"
-    : "http://127.0.0.1:8000/api/upload/admission";
+    ? `${window.EDU_GUARD_API_URL || API_BASE_URL}/api/upload/weekly`
+    : `${window.EDU_GUARD_API_URL || API_BASE_URL}/api/upload/admission`;
 
   try {
     const token = localStorage.getItem("eduguard_token");

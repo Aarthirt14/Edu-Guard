@@ -50,3 +50,6 @@ backend/evaluation-output/
 *.db-journal
 backend/app/ml/*.metadata.json
 backend/app/ml/data/*.csv
+
+backend/app/ml/candidate-models/
+backend/candidate-models/
