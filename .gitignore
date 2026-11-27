@@ -41,3 +41,15 @@ ENV/
 # Data
 backend/data/
 frontend/test_*.csv
+
+# Generated local models and evaluation runs
+backend/app/ml/*.pkl
+backend/app/ml/data/*.marker
+backend/evaluation-output/
+.pytest_cache/
+*.db-journal
+backend/app/ml/*.metadata.json
+backend/app/ml/data/*.csv
+
+backend/app/ml/candidate-models/
+backend/candidate-models/

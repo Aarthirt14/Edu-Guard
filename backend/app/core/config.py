@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "EduGuard AI"
     DEBUG: bool = True
+    DEMO_MODE: bool = True
 
     # Server
     HOST: str = "0.0.0.0"

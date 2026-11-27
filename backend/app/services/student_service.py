@@ -25,6 +25,8 @@ def get_high_risk_students(
     query = db.query(Student).filter(Student.risk_score >= threshold)
 
     # Faculty sees only their class
+    if role == UserRole.faculty and not assigned_class:
+        return []
     if role == UserRole.faculty and assigned_class:
         query = query.filter(Student.class_name == assigned_class)
     elif class_filter:
@@ -55,17 +57,11 @@ def create_student(db: Session, data: StudentCreate) -> Student:
     if existing:
         raise HTTPException(status_code=400, detail=f"Student ID '{data.id}' already exists")
 
-    sem_num = int(data.semester.split()[-1]) if "Semester" in data.semester else 4
-    pred = predict_risk(data.attendance, data.marks,
-                        data.has_financial_issue, data.has_family_issue, sem_num)
-
-    student = Student(
-        **data.model_dump(),
-        risk_score=pred["risk_score"],
-        risk_trend="up" if pred["risk_score"] >= 70 else "stable",
-    )
+    student = Student(**data.model_dump(), risk_trend="stable")
     db.add(student)
-    db.add(RiskHistory(student_id=data.id, risk_score=pred["risk_score"]))
+    db.flush()
+    from app.services.prediction_service import refresh_prediction
+    refresh_prediction(db, student)
     db.commit()
     db.refresh(student)
     return student
@@ -76,16 +72,8 @@ def update_student(db: Session, student_id: str, data: StudentUpdate) -> Student
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(student, field, value)
 
-    # Re-run prediction after update
-    sem_num = int(student.semester.split()[-1]) if "Semester" in student.semester else 4
-    pred = predict_risk(student.attendance, student.marks,
-                        student.has_financial_issue, student.has_family_issue, sem_num)
-
-    old_score = student.risk_score
-    student.risk_score = pred["risk_score"]
-    student.risk_trend = "up" if pred["risk_score"] > old_score else "down"
-
-    db.add(RiskHistory(student_id=student_id, risk_score=pred["risk_score"]))
+    from app.services.prediction_service import refresh_prediction
+    refresh_prediction(db, student)
     db.commit()
     db.refresh(student)
     return student
@@ -161,7 +149,8 @@ def get_risk_trend_factors(db: Session, student_id: str) -> dict:
     return {
         "student_id": student.id,
         "student_name": student.name,
-        "risk_score": float(student.risk_score or 0),
+        "risk_score": student.risk_score,
+        "prediction": student.prediction,
         "attendance_trend": attendance_trend,
         "marks_trend": marks_trend,
         "fee_trend": fee_trend,

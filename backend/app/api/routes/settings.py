@@ -1,5 +1,5 @@
 """System settings endpoints (admin only)."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -18,6 +18,9 @@ def _get_or_create(db: Session) -> SystemSettings:
         db.add(s)
         db.commit()
         db.refresh(s)
+    if s.email_notifications or s.sms_alerts or s.ai_auto_suggestions:
+        s.email_notifications = s.sms_alerts = s.ai_auto_suggestions = False
+        db.commit()
     return s
 
 
@@ -50,6 +53,8 @@ def update_notifications(
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.admin)),
 ):
+    if data.email_notifications or data.sms_alerts or data.ai_auto_suggestions:
+        raise HTTPException(409, "Email/SMS and scheduled suggestions are unavailable. Use the support inbox and run Copilot manually.")
     s = _get_or_create(db)
     s.email_notifications = data.email_notifications
     s.sms_alerts = data.sms_alerts

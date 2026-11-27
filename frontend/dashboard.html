@@ -13,6 +13,7 @@
 </head>
 
 <body>
+  <div style="background:#16334a;color:#e2edf7;padding:10px 24px;text-align:center;font-size:13px;position:relative;z-index:100">Research prototype · Synthetic training data · Staff review required · Real-world validation pending</div>
 
   <div class="app-container">
 
@@ -541,6 +542,7 @@
       <section class="page-content page-section" id="page-student">
         <div class="page-header">
           <h2>My Dashboard</h2>
+          <p id="studentPredictionSummary">Loading recorded prediction…</p>
           <p>Your personal risk overview and support resources</p>
         </div>
 
@@ -554,7 +556,7 @@
                   <div class="risk-label">Support</div>
                 </div>
               </div>
-              <h3 style="color:var(--accent-secondary);margin-bottom:8px;font-size:20px;">Support Plan Available</h3>
+              <h3 style="color:var(--accent-secondary);margin-bottom:8px;font-size:20px;">Your Support Overview</h3>
               <p class="risk-explanation">
                 Your support team is monitoring your progress and has enabled personalized assistance for attendance,
                 academics, counseling, and fee planning. Check the sections below for active updates and next steps.
@@ -578,7 +580,7 @@
           <div class="support-card">
             <div class="support-icon cyan"><i class="fas fa-book"></i></div>
             <h4>Academic Support</h4>
-            <p id="studentSupportAcademic">Learning plan · <span class="text-cyan">In Progress</span></p>
+            <p id="studentSupportAcademic">No academic plan recorded</p>
           </div>
         </div>
 
@@ -762,7 +764,7 @@
           </div>
           <div class="chart-container analytics-chart-card analytics-top-card">
             <div class="chart-header">
-              <h3>Intervention Success Rate</h3>
+              <h3>Recorded Intervention Outcomes</h3>
             </div>
             <canvas class="chart-canvas analytics-chart-canvas analytics-top-canvas" id="interventionChart"></canvas>
           </div>
@@ -936,7 +938,7 @@
                 <div class="upload-drop-icon"><i class="fas fa-cloud-upload-alt"></i></div>
                 <p class="upload-drop-text">Drag & drop your <strong>students_static.csv</strong> here, or <span
                     class="upload-browse" onclick="document.getElementById('uploadFileInput').click()">browse</span></p>
-                <p class="upload-drop-hint" id="uploadHint">Accepts .csv or .json files (Max 10MB)</p>
+                <p class="upload-drop-hint" id="uploadHint">Accepts .csv or .json files (Max 5MB)</p>
                 <input type="file" id="uploadFileInput" accept=".csv,.json" style="display:none;"
                   onchange="handleUploadFile(event)" />
               </div>
@@ -1308,29 +1310,20 @@
           </div>
           <div class="card">
             <div class="card-header">
-              <h3>Notification Preferences</h3>
+              <h3>Notification Preferences</h3><p>Email, SMS and scheduled suggestions are unavailable. Use the support inbox for messages and run Copilot manually.</p>
             </div>
             <div class="card-body">
               <div class="form-group">
                 <label>Email Notifications</label>
-                <select id="emailNotifications">
-                  <option value="Enabled">Enabled</option>
-                  <option value="Disabled">Disabled</option>
-                </select>
+                <select id="emailNotifications" disabled><option value="Disabled">Unavailable</option></select>
               </div>
               <div class="form-group">
                 <label>SMS Alerts for Critical Students</label>
-                <select id="smsAlerts">
-                  <option value="Enabled">Enabled</option>
-                  <option value="Disabled">Disabled</option>
-                </select>
+                <select id="smsAlerts" disabled><option value="Disabled">Unavailable</option></select>
               </div>
               <div class="form-group">
                 <label>AI Auto-Intervention Suggestions</label>
-                <select id="aiSuggestions">
-                  <option value="Enabled">Enabled</option>
-                  <option value="Disabled">Disabled</option>
-                </select>
+                <select id="aiSuggestions" disabled><option value="Disabled">Unavailable</option></select>
               </div>
               <button class="btn btn-primary mt-1" onclick="savePreferences()"><i class="fas fa-save"></i> Save Preferences</button>
             </div>
@@ -1360,7 +1353,7 @@
         <div class="upload-area" onclick="document.getElementById('facultyWeeklyFileInput').click()">
           <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
           <p>Drag & drop weekly CSV here, or <span>browse</span></p>
-          <p class="text-muted" style="font-size:12px;margin-top:8px;">Supports CSV/JSON (Max 10MB)</p>
+          <p class="text-muted" style="font-size:12px;margin-top:8px;">Supports CSV/JSON (Max 5MB)</p>
           <input type="file" id="facultyWeeklyFileInput" accept=".csv,.json" style="display:none;" onchange="handleFacultyWeeklyFile(event)" />
         </div>
         <p class="text-muted" id="facultyWeeklyFileName" style="font-size:12px;margin-top:8px;">No file selected</p>
@@ -1574,6 +1567,30 @@
   <script src="auth.js?v=14"></script>
   <script src="app.js?v=16"></script>
 
+<dialog id="followUpDialog" style="width:min(560px,90vw);background:#142338;color:#eef5ff;border:1px solid #39728d;border-radius:16px;padding:28px">
+  <form onsubmit="saveFollowUp(event)">
+    <h2>Review and follow up</h2>
+    <p>Record observations separately from model scores. Improvement alone does not prove the intervention caused it.</p>
+    <input type="hidden" id="followUpId">
+    <label>Status <select id="followUpStatus"><option>Pending</option><option>Active</option><option>Completed</option></select></label>
+    <label>Owner staff ID <input id="followUpOwner"></label>
+    <label>Follow-up due <input id="followUpDue" type="datetime-local"></label>
+    <label>Follow-up observations <textarea id="followUpObservation" rows="3" maxlength="4000"></textarea></label>
+    <label>Attendance % <input id="followUpAttendance" type="number" min="0" max="100" step="0.1"></label>
+    <label>Marks % <input id="followUpMarks" type="number" min="0" max="100" step="0.1"></label>
+    <label>Closure reason (required to complete) <textarea id="followUpClosure" rows="2" maxlength="2000"></textarea></label>
+    <p id="followUpError" role="alert"></p>
+    <button type="submit" class="btn btn-primary">Save review</button>
+    <button type="button" class="btn btn-ghost" onclick="document.getElementById('followUpDialog').close()">Cancel</button>
+  </form>
+</dialog>
+<style>#followUpDialog::backdrop{background:#0009}#followUpDialog label{display:block;margin:12px 0}#followUpDialog input,#followUpDialog textarea,#followUpDialog select{display:block;width:100%;padding:8px;background:#0c192b;color:white;border:1px solid #42607c;border-radius:5px}#followUpError{color:#ffb1a6}</style>
+<dialog id="supportReplyDialog" style="width:min(520px,90vw);padding:24px;background:#142338;color:white;border-radius:12px">
+<form onsubmit="saveSupportReply(event)"><h2>Support reply</h2><input id="supportReplyId" type="hidden">
+<textarea id="supportReplyMessage" required maxlength="4000" rows="5" style="width:100%" aria-label="Reply message"></textarea>
+<select id="supportReplyStatus" aria-label="Request status"><option>In Progress</option><option>Resolved</option><option>Open</option></select>
+<p id="supportReplyError" role="alert"></p><button class="btn btn-primary" type="submit">Save reply</button>
+<button class="btn btn-ghost" type="button" onclick="document.getElementById('supportReplyDialog').close()">Cancel</button></form></dialog>
 </body>
 
 </html>

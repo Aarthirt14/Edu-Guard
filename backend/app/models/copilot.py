@@ -36,6 +36,7 @@ class CopilotActionTicket(Base):
     priority = Column(String, nullable=False, default="Medium")
     n8n_status = Column(String, nullable=False, default="not_configured")
     n8n_reference = Column(String, nullable=True)
+    policy_references = Column(JSON, nullable=True)
     status = Column(String, nullable=False, default="Open")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

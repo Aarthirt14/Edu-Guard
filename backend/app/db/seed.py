@@ -4,7 +4,7 @@
 import logging
 from sqlalchemy.orm import Session
 from app.models.user import User, UserRole
-from app.models.student import Student, RiskHistory
+from app.models.student import Student, RiskHistory, WeeklyRecord
 from app.models.intervention import Intervention, InterventionType, InterventionStatus, InterventionOutcome, TimelineEvent
 from app.core.security import hash_password
 from app.ml.model import predict_risk
@@ -68,7 +68,7 @@ def seed_students(db: Session):
     for s in raw_students:
         sem_num = int(s["semester"].split()[-1])
         pred = predict_risk(s["attendance"], s["marks"], s["financial"], s["family"], sem_num)
-        trend = "up" if pred["risk_score"] >= 75 else "down"
+        trend = "stable"
 
         student = Student(
             id=s["id"],
@@ -84,13 +84,17 @@ def seed_students(db: Session):
         )
         db.add(student)
 
-        # Add a few history points
-        for i in range(3):
-            db.add(RiskHistory(
-                student_id=s["id"],
-                risk_score=max(0, pred["risk_score"] - (i * 5)),
-                recorded_at=datetime.utcnow() - timedelta(weeks=i * 2)
-            ))
+        if s["id"] == "STU-1024":
+            student.user_id = "student1"
+        db.flush()
+        # Explicitly synthetic demo trajectories; never generated for uploaded students.
+        for week in range(1, 5):
+            db.add(WeeklyRecord(student_id=student.id, week_number=week,
+                attendance_pct=min(100, s["attendance"] + (4 - week) * 4),
+                ia_marks=s["marks"] * .4, backlog_count=1,
+                fee_outstanding=s["financial"]))
+        from app.services.weekly_service import process_weekly_upload_for_student
+        process_weekly_upload_for_student(db, student)
 
     db.commit()
     logger.info("✅ Seeded students with ML-computed risk scores")

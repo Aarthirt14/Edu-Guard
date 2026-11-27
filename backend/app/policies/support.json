@@ -1,0 +1,5 @@
+[
+  {"id":"demo-attendance","document":"EduGuard example support playbook","section":"Attendance support","version":"1","effective_date":"2026-11-27","approved":false,"text":"For a sustained attendance decline, propose a private student conversation and an agreed follow-up date. Staff must review the student context before acting."},
+  {"id":"demo-financial","document":"EduGuard example support playbook","section":"Financial support","version":"1","effective_date":"2026-11-27","approved":false,"text":"For outstanding fees or a financial help request, propose a financial aid appointment. Verify eligibility against an approved institutional scholarship policy; do not promise an award."},
+  {"id":"demo-academic","document":"EduGuard example support playbook","section":"Academic support","version":"1","effective_date":"2026-11-27","approved":false,"text":"For falling marks or growing backlogs, propose subject-specific academic support and a two-week progress review. External or guardian contact requires staff approval and applicable student consent."}
+]

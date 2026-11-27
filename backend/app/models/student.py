@@ -17,8 +17,8 @@ class Student(Base):
     semester = Column(String, nullable=False)                    # "Semester 4"
 
     # --- Legacy simple fields (kept for backward compat) ---
-    attendance = Column(Float, default=100.0)
-    marks = Column(Float, default=100.0)
+    attendance = Column(Float, nullable=True)
+    marks = Column(Float, nullable=True)
     has_financial_issue = Column(Boolean, default=False)
     has_family_issue = Column(Boolean, default=False)
 
@@ -36,7 +36,8 @@ class Student(Base):
     # --- Risk scores ---
     baseline_risk_score = Column(Float, nullable=True)          # Model 1 — set once
     dynamic_risk_score = Column(Float, nullable=True)           # Model 2 — updated weekly
-    risk_score = Column(Float, default=0.0)                     # Blended score
+    prediction = Column(JSON, nullable=True)
+    risk_score = Column(Float, nullable=True, default=None)                     # Blended score
     risk_trend = Column(String, default="stable")               # "up" | "down" | "stable"
     weeks_tracked = Column(Integer, default=0)
 
@@ -58,9 +59,9 @@ class Student(Base):
         factors = []
         if self.has_financial_issue or (self.family_income and self.family_income < 20000):
             factors.append("financial")
-        if self.attendance < 60:
+        if self.attendance is not None and self.attendance < 60:
             factors.append("attendance")
-        if self.marks < 40:
+        if self.marks is not None and self.marks < 40:
             factors.append("academic")
         if self.has_family_issue:
             factors.append("family")
@@ -89,7 +90,8 @@ class RiskHistory(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(String, ForeignKey("students.id"), nullable=False)
-    risk_score = Column(Float, nullable=False)
+    risk_score = Column(Float, nullable=True)
+    prediction = Column(JSON, nullable=True)
     recorded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     student = relationship("Student", back_populates="risk_history")

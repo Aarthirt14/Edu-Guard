@@ -1,16 +1,18 @@
 /* ==========================================
    EduGuard AI - Authentication Logic
    Connects to FastAPI backend at /api/auth/login
-   Falls back to mock data if backend unavailable
+   Requires successful server authentication
    ========================================== */
 
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? "http://127.0.0.1:8000/api" 
+const DEFAULT_AUTH_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? "http://127.0.0.1:8000/api"
     : "https://edu-guard.onrender.com/api";
 
-// ===== FALLBACK MOCK USERS (if backend is offline) =====
+const API_BASE = window.EDU_GUARD_API_URL ? window.EDU_GUARD_API_URL.replace(/\/$/, "") + "/api" : DEFAULT_AUTH_BASE;
 
-const mockUsers = [
+// ===== DEMO FORM PREFILL (still requires real server authentication) =====
+
+const demoUsers = [
     { id: "admin1", email: "admin@eduguard.com", password: "admin123", role: "admin", name: "Dr. Arun Kumar" },
     { id: "faculty1", email: "faculty@eduguard.com", password: "faculty123", role: "faculty", name: "Prof. Meena" },
     { id: "counselor1", email: "counselor@eduguard.com", password: "counselor123", role: "counselor", name: "Dr. Ravi" },
@@ -38,7 +40,7 @@ let selectedRole = null;
     if (stored) {
         try {
             const user = JSON.parse(stored);
-            if (user && user.role && rolePageMap[user.role]) {
+            if (user && user.source === "backend" && localStorage.getItem("eduguard_token") && user.role && rolePageMap[user.role]) {
                 window.location.href = "dashboard.html?page=" + rolePageMap[user.role];
             }
         } catch (e) {
@@ -116,24 +118,6 @@ async function tryBackendLogin(email, password, role) {
     }
 }
 
-function tryMockLogin(email, password, role) {
-    const user = mockUsers.find(u =>
-        (u.email === email || u.id === email) &&
-        u.password === password &&
-        u.role === role
-    );
-    if (!user) return null;
-    return {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-        token: null,
-        loginTime: new Date().toISOString(),
-        source: "mock",
-    };
-}
-
 async function handleLogin(e) {
     e.preventDefault();
 
@@ -150,9 +134,7 @@ async function handleLogin(e) {
 
     // Try real backend first, then mock
     let session = await tryBackendLogin(email, password, selectedRole);
-    if (!session) {
-        session = tryMockLogin(email, password, selectedRole);
-    }
+    // Backend rejection or outage must never become a mock authenticated session.
 
     if (session) {
         if (session.token) {
@@ -187,7 +169,7 @@ function hideError() {
 // ===== QUICK DEMO LOGIN =====
 
 function fillDemo(role) {
-    const user = mockUsers.find(u => u.role === role);
+    const user = demoUsers.find(u => u.role === role);
     if (!user) return;
     const roleCard = document.querySelector(`.role-card[data-role="${role}"]`);
     if (roleCard) selectRole(role, roleCard);
@@ -214,7 +196,8 @@ function getLoggedInUser() {
 
 function enforceAuth() {
     const user = getCurrentUser();
-    if (!user) {
+    if (!user || user.source !== "backend" || !localStorage.getItem("eduguard_token")) {
+        localStorage.removeItem("eduguard_user");
         window.location.href = "login.html";
         return null;
     }

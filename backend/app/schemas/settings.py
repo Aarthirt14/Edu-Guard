@@ -17,6 +17,8 @@ class NotificationUpdate(BaseModel):
 
 
 class SettingsOut(BaseModel):
+    notification_delivery_available: bool = False
+    notification_status: str = "Email/SMS delivery unavailable; support replies are available in the portal."
     high_risk_threshold: int
     attendance_alert_threshold: int
     marks_drop_alert_percentage: int

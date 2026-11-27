@@ -45,7 +45,7 @@ def analytics(
 async def chat(
     payload: AIChatRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user),
+    _: User = Depends(require_role(UserRole.admin, UserRole.counselor)),
 ):
     """
     Powers the floating AI chat panel.

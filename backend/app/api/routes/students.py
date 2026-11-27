@@ -20,6 +20,7 @@ from app.services.auth_service import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.ml.model import predict_risk
 from app.core.config import settings
+from app.services.access import ensure_student_access
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -45,7 +46,10 @@ def high_risk_students(
     const students = await res.json();
     ```
     """
-    t = threshold or settings.HIGH_RISK_THRESHOLD
+    if current_user.role == UserRole.student:
+        from fastapi import HTTPException
+        raise HTTPException(403, "Student accounts cannot list other students")
+    t = threshold if threshold is not None else settings.HIGH_RISK_THRESHOLD
     return get_high_risk_students(
         db, t,
         class_filter=class_filter,
@@ -62,7 +66,7 @@ def student_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    student = get_student_by_id(db, student_id)
+    student = ensure_student_access(db, current_user, student_id)
     # Students can only view themselves
     if current_user.role == UserRole.student and student.user_id != current_user.id:
         from fastapi import HTTPException
@@ -84,12 +88,16 @@ def update(
     student_id: str,
     data: StudentUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role(UserRole.admin, UserRole.faculty)),
+    current_user: User = Depends(require_role(UserRole.admin, UserRole.faculty)),
 ):
     """
     Called when faculty uploads attendance/marks CSV.
     Re-runs ML model and updates risk_score + trend.
     """
+    ensure_student_access(db, current_user, student_id)
+    if current_user.role == UserRole.faculty and "counselor_id" in data.model_fields_set:
+        from fastapi import HTTPException
+        raise HTTPException(403, "Only administrators can change counselor assignment")
     return update_student(db, student_id, data)
 
 
@@ -103,6 +111,7 @@ def risk_history(
     Returns array of {risk_score, recorded_at} — used by the
     student dashboard attendance/marks trend charts.
     """
+    ensure_student_access(db, current_user, student_id)
     history = get_risk_history(db, student_id)
     return [{"risk_score": h.risk_score, "recorded_at": h.recorded_at} for h in history]
 
@@ -113,7 +122,7 @@ def risk_trend(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    student = get_student_by_id(db, student_id)
+    student = ensure_student_access(db, current_user, student_id)
     if current_user.role == UserRole.student and student.user_id != current_user.id:
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Access denied")
@@ -151,3 +160,19 @@ def predict(
         semester=data.semester or 4,
     )
     return PredictResponse(**result)
+
+
+@router.get("/{student_id}/prediction", summary="Versioned prediction and feature sensitivities")
+def prediction_detail(student_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    student = ensure_student_access(db, current_user, student_id)
+    return student.prediction or {"risk_score": None, "mode": "not_scored", "validation_status": "not_validated"}
+
+
+@router.get("/me/profile", response_model=StudentOut, summary="Current student's linked profile")
+def own_profile(db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.student))):
+    from app.models.student import Student
+    from fastapi import HTTPException
+    student = db.query(Student).filter(Student.user_id == current_user.id).first()
+    if not student:
+        raise HTTPException(404, "No linked student profile")
+    return student

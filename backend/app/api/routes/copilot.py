@@ -37,3 +37,20 @@ def get_run_detail(
     _: User = Depends(require_role(UserRole.admin, UserRole.counselor)),
 ):
     return get_copilot_run_detail(db, run_id)
+
+
+@router.post("/tickets/{ticket_id}/approve", summary="Staff approval creates a pending intervention")
+def approve_ticket(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_role(UserRole.admin, UserRole.counselor))):
+    from fastapi import HTTPException
+    from app.models.copilot import CopilotActionTicket
+    from app.schemas.intervention import InterventionCreate
+    from app.services.intervention_service import create_intervention
+    ticket = db.get(CopilotActionTicket, ticket_id)
+    if not ticket:
+        raise HTTPException(404, "Ticket not found")
+    if ticket.status != "Open":
+        raise HTTPException(409, "Ticket already reviewed")
+    ticket.status = "Approved"
+    intervention = create_intervention(db, InterventionCreate(student_id=ticket.student_id,
+        type=ticket.recommended_intervention, notes=f"Staff-approved Copilot proposal #{ticket.id}: {ticket.reason_summary}"), current_user)
+    return {"ticket_id": ticket.id, "status": ticket.status, "intervention_id": intervention.id}

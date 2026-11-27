@@ -101,7 +101,8 @@ async function fetchAPI(endpoint, options = {}) {
         window.location.href = "login.html";
       }
     }
-    throw new Error(`API error ${res.status}`);
+    const failure = await res.json().catch(() => ({}));
+    throw new Error(typeof failure.detail === "string" ? failure.detail : `API error ${res.status}`);
   }
   return res.json();
 }
@@ -127,7 +128,7 @@ async function fetchDashboardData(user) {
   }
 
   try {
-    const rawStudents = await fetchAPI('/api/students/high-risk');
+    const rawStudents = user.role === 'student' ? [] : await fetchAPI('/api/students/high-risk');
     highRiskStudents = rawStudents.map(s => ({
       id: s.id,
       name: s.name,
@@ -135,8 +136,8 @@ async function fetchDashboardData(user) {
       semester: s.semester,
       riskScore: s.risk_score,
       trend: s.risk_trend || "up",
-      attendance: s.attendance || 0,
-      marks: s.marks || 0,
+      attendance: s.attendance ?? null,
+      marks: s.marks ?? null,
       factors: s.risk_factors || [],
       intervention: "None",
       counselor: null
@@ -147,8 +148,13 @@ async function fetchDashboardData(user) {
   }
 
   try {
-    const rawInterventions = await fetchAPI('/api/interventions/');
+    const rawInterventions = user.role === 'student' ? [] : await fetchAPI('/api/interventions/');
     interventions = rawInterventions.map(i => ({
+      id: i.id,
+      dueAt: i.due_at,
+      ownerId: i.owner_id,
+      closureReason: i.closure_reason,
+      followUpObservation: i.follow_up_observation,
       studentId: i.student_id,
       studentName: i.student_name || i.student_id,
       className: i.class_name || "—",
@@ -360,18 +366,19 @@ function renderInterventionsTable() {
       <td>
         <div class="student-info">
           <div class="student-avatar">${getInitials(i.studentName)}</div>
-          <div class="student-name">${i.studentName}</div>
+          <div class="student-name">${escapeHtml(i.studentName)}</div>
         </div>
       </td>
-      <td>${i.type}</td>
-      <td>${i.assignedBy}</td>
-      <td>${i.date}</td>
+      <td>${escapeHtml(i.type)}</td>
+      <td>${escapeHtml(i.assignedBy)}</td>
+      <td>${i.date}<br><small>Due: ${i.dueAt ? escapeHtml(new Date(i.dueAt).toLocaleDateString()) : "Unscheduled"}</small></td>
       <td><span class="badge badge-${i.status.toLowerCase()}">${i.status}</span></td>
       <td>
         <span class="${i.outcome === 'Improving' || i.outcome === 'Improved' ? 'text-cyan' : i.outcome === 'Stable' ? 'text-blue' : 'text-muted'}">${i.outcome}</span>
       </td>
       <td>
         <button class="btn btn-ghost btn-sm" onclick="openTimelineModal('${i.studentId}', '${i.studentName.replace(/'/g, "\\'")}')"><i class="fas fa-history"></i> Timeline</button>
+        <button class="btn btn-ghost btn-sm" onclick="openFollowUp(${Number(i.id)})">Review / follow up</button>
       </td>
     </tr>
   `).join("");
@@ -397,8 +404,8 @@ async function applyHighRiskFilters() {
       semester: s.semester,
       riskScore: s.risk_score,
       trend: s.risk_trend || "up",
-      attendance: s.attendance || 0,
-      marks: s.marks || 0,
+      attendance: s.attendance ?? null,
+      marks: s.marks ?? null,
       factors: s.risk_factors || [],
       intervention: "None",
       counselor: null
@@ -533,9 +540,9 @@ async function saveThresholds() {
 
 async function savePreferences() {
   const payload = {
-    email_notifications: (document.getElementById("emailNotifications")?.value || "Enabled") === "Enabled",
-    sms_alerts: (document.getElementById("smsAlerts")?.value || "Enabled") === "Enabled",
-    ai_auto_suggestions: (document.getElementById("aiSuggestions")?.value || "Enabled") === "Enabled",
+    email_notifications: false,
+    sms_alerts: false,
+    ai_auto_suggestions: false,
   };
 
   try {
@@ -812,8 +819,8 @@ function renderCopilotTicketsTable() {
         <td>${risk.toFixed(1)}</td>
         <td><span class="badge badge-${priorityCls}">${escapeHtml(t.priority || "Medium")}</span></td>
         <td>${escapeHtml(t.recommended_intervention || "—")}</td>
-        <td style="max-width:320px;">${escapeHtml(cleanReason)}</td>
-        <td>${escapeHtml(t.status || "Open")}</td>
+        <td style="max-width:320px;">${escapeHtml(cleanReason)}<br><small>${(t.policy_references || []).map(p => escapeHtml(`${p.document} / ${p.section} v${p.version} · ${p.approved ? 'Approved policy' : 'Example, not institution-approved'}`)).join('<br>')}</small></td>
+        <td>${escapeHtml(t.status || "Open")}${t.status === 'Open' ? `<br><button class="btn btn-ghost btn-sm" onclick="approveCopilotTicket(${Number(t.id)})">Approve proposal</button>` : ''}</td>
       </tr>
     `;
   }).join("");
@@ -1080,8 +1087,8 @@ function renderFacultyTable() {
           </div>
         </div>
       </td>
-      <td><span class="text-danger" style="font-weight:600;">${s.attendance}%</span></td>
-      <td><span class="text-danger" style="font-weight:600;">${s.marks}/100</span></td>
+      <td><span class="text-danger" style="font-weight:600;">${s.attendance == null ? "Not recorded" : `${s.attendance}%`}</span></td>
+      <td><span class="text-danger" style="font-weight:600;">${s.marks == null ? "Not recorded" : `${s.marks}/100`}</span></td>
       <td>
         <span class="risk-score">
           ${s.riskScore}
@@ -1219,8 +1226,8 @@ function updateFacultyStats(classStudents, assignedClass) {
   if (classNameEl) classNameEl.textContent = assignedClass || "Assigned Class";
 
   const highRiskCount = classStudents.length;
-  const attendanceDropCount = classStudents.filter(s => Number(s.attendance || 0) < 60).length;
-  const marksDropCount = classStudents.filter(s => Number(s.marks || 0) < 40).length;
+  const attendanceDropCount = classStudents.filter(s => s.attendance != null && Number(s.attendance) < 60).length;
+  const marksDropCount = classStudents.filter(s => s.marks != null && Number(s.marks) < 40).length;
   const immediateCount = classStudents.filter(s => Number(s.riskScore || 0) >= 85 && s.intervention === "None").length;
 
   if (highRiskEl) highRiskEl.textContent = highRiskCount;
@@ -1534,7 +1541,7 @@ function renderStudentSupportCards() {
     const activeCounseling = counselingSessions.some(s => String(s.status || "").toLowerCase() === "active");
     academicEl.innerHTML = activeCounseling
       ? `Follow-up with faculty · <span class="text-cyan">Scheduled</span>`
-      : `Learning plan · <span class="text-cyan">In Progress</span>`;
+      : `No academic plan recorded`;
   }
 }
 
@@ -1595,60 +1602,80 @@ function renderStudentActionPlanAndTimeline() {
   }
 }
 
-function renderStudentHelpRequests() {
-  const container = document.getElementById("studentHelpRequestList");
-  if (!container) return;
+let supportRequests = [];
+let supportSubmissionKey = null;
 
-  const raw = localStorage.getItem("eduguard_student_help_requests");
-  const rows = raw ? JSON.parse(raw) : [];
-
-  if (!rows.length) {
-    container.innerHTML = '<div class="text-muted">No help requests submitted yet.</div>';
-    return;
+async function renderStudentHelpRequests() {
+  const user = getCurrentUser();
+  if (!user || !['student', 'admin', 'counselor'].includes(user.role)) return;
+  let container = document.getElementById('studentHelpRequestList');
+  if (user.role !== 'student') {
+    container = document.getElementById('staffSupportInbox');
+    if (!container) {
+      const card = document.createElement('section');
+      card.className = 'card mb-3';
+      card.innerHTML = '<div class="card-header"><h3>Student support inbox</h3><button class="btn btn-ghost" onclick="renderStudentHelpRequests()">Refresh</button></div><div class="card-body" id="staffSupportInbox"></div>';
+      document.getElementById(user.role === 'admin' ? 'page-dashboard' : 'page-counselor').appendChild(card);
+      container = card.querySelector('#staffSupportInbox');
+    }
   }
-
-  container.innerHTML = rows.slice(0, 6).map(r => `
-    <div style="padding:8px 0;border-bottom:1px solid var(--border-color);">
-      <div style="font-weight:600;">${escapeHtml(r.category)}</div>
-      <div class="text-muted" style="font-size:12px;">${escapeHtml(r.time)}</div>
-      <div style="font-size:13px;margin-top:4px;">${escapeHtml(r.message)}</div>
-    </div>
-  `).join("");
+  try {
+    supportRequests = await fetchAPI('/api/support/requests');
+    container.innerHTML = supportRequests.map(r => `<article style="padding:12px;border-bottom:1px solid var(--border-color)">
+      <strong>#${Number(r.id)} · ${escapeHtml(r.category)} · ${escapeHtml(r.status)}</strong>
+      <div>${escapeHtml(r.student_id)} · ${escapeHtml(new Date(r.created_at).toLocaleString())}</div>
+      <p>${escapeHtml(r.message)}</p>
+      ${(r.replies || []).map(reply => `<p><strong>${escapeHtml(reply.author_name)} (${escapeHtml(reply.author_role)})</strong>: ${escapeHtml(reply.message)}</p>`).join('')}
+      <button class="btn btn-ghost" onclick="openSupportReply(${Number(r.id)})">Reply / review</button>
+    </article>`).join('') || '<p>No support requests yet.</p>';
+  } catch (error) { container.textContent = 'Unable to load support requests. ' + error.message; }
 }
 
-function submitStudentHelpRequest() {
-  const category = document.getElementById("studentHelpCategory")?.value?.trim();
-  const message = document.getElementById("studentHelpMessage")?.value?.trim();
+async function submitStudentHelpRequest() {
+  const category = document.getElementById('studentHelpCategory').value;
+  const message = document.getElementById('studentHelpMessage').value.trim();
+  if (!category || !message) { alert('Select a category and enter your message.'); return; }
+  supportSubmissionKey ||= crypto.randomUUID();
+  try {
+    await fetchAPI('/api/support/requests', {method: 'POST', body: JSON.stringify({category, message, submission_key: supportSubmissionKey})});
+    supportSubmissionKey = null;
+    document.getElementById('studentHelpMessage').value = '';
+    await renderStudentHelpRequests();
+    alert('Your request was saved to the support inbox. Replies will appear here.');
+  } catch (error) { alert('Request not confirmed as saved: ' + error.message + '. Your message remains here so you can retry.'); }
+}
 
-  if (!category || !message) {
-    alert("Please select category and enter your message.");
-    return;
-  }
+function openSupportReply(id) {
+  document.getElementById('supportReplyId').value = id;
+  document.getElementById('supportReplyMessage').value = '';
+  document.getElementById('supportReplyError').textContent = '';
+  document.getElementById('supportReplyStatus').hidden = getCurrentUser().role === 'student';
+  document.getElementById('supportReplyStatus').value = 'In Progress';
+  document.getElementById('supportReplyDialog').showModal();
+}
 
-  const raw = localStorage.getItem("eduguard_student_help_requests");
-  const rows = raw ? JSON.parse(raw) : [];
-  rows.unshift({
-    category,
-    message,
-    time: new Date().toLocaleString(),
-  });
-
-  localStorage.setItem("eduguard_student_help_requests", JSON.stringify(rows.slice(0, 20)));
-
-  const categoryEl = document.getElementById("studentHelpCategory");
-  const messageEl = document.getElementById("studentHelpMessage");
-  if (categoryEl) categoryEl.value = "";
-  if (messageEl) messageEl.value = "";
-
-  renderStudentHelpRequests();
-  alert("Help request submitted. Your support team will review it.");
+async function saveSupportReply(event) {
+  event.preventDefault();
+  const id = Number(document.getElementById('supportReplyId').value);
+  const payload = {message: document.getElementById('supportReplyMessage').value};
+  if (getCurrentUser().role !== 'student') payload.status = document.getElementById('supportReplyStatus').value;
+  try {
+    await fetchAPI(`/api/support/requests/${id}/replies`, {method: 'POST', body: JSON.stringify(payload)});
+    document.getElementById('supportReplyDialog').close();
+    await renderStudentHelpRequests();
+  } catch (error) { document.getElementById('supportReplyError').textContent = error.message; }
 }
 
 async function updateStudentTrendCharts() {
-  const studentId = studentFinancialCase?.student_id || counselingSessions[0]?.student_id || null;
-  if (!studentId) return;
-
+  const user = JSON.parse(localStorage.getItem('eduguard_user') || '{}');
+  if (user.role !== 'student') return;
   try {
+    const profile = await fetchAPI('/api/students/me/profile');
+    const studentId = profile.id;
+    const summary = document.getElementById('studentPredictionSummary');
+    if (summary) summary.textContent = profile.risk_score == null
+      ? 'Not enough recorded data for a score. Your support team can help complete your records.'
+      : `Experimental support score: ${Number(profile.risk_score).toFixed(1)} / 100. This is not a verified dropout probability. ${profile.prediction?.weeks_tracked || 0} weekly records used.`;
     const trend = await fetchAPI(`/api/students/${studentId}/risk-trend`);
     const attendancePoints = Array.isArray(trend.attendance_points) ? trend.attendance_points : [];
     const marksPoints = Array.isArray(trend.marks_points) ? trend.marks_points : [];
@@ -1670,7 +1697,8 @@ async function updateStudentTrendCharts() {
       studentMarksChart.update();
     }
   } catch (e) {
-    // Keep default chart if student trend endpoint is unavailable for this account mapping.
+    const summary = document.getElementById("studentPredictionSummary");
+    if (summary) summary.textContent = "Your recorded prediction is unavailable. Contact your support team.";
   }
 }
 
@@ -1870,6 +1898,22 @@ async function openRiskTrendModal(studentId, studentName) {
     const data = await fetchAPI(`/api/students/${studentId}/risk-trend`);
     if (!data) throw new Error("No data returned");
 
+    const prediction = data.prediction || {};
+    let panel = document.getElementById('predictionEvidence');
+    if (!panel && driversEl) {
+      panel = document.createElement('section');
+      panel.id = 'predictionEvidence';
+      driversEl.parentElement.appendChild(panel);
+    }
+    if (panel) {
+      panel.innerHTML = `<h3>Prediction evidence</h3>
+        <p><strong>${prediction.risk_score == null ? 'Insufficient data' : `${Number(prediction.risk_score).toFixed(1)} / 100`}</strong> · ${escapeHtml(prediction.mode || 'Not scored')}</p>
+        <p>Experimental score trained on synthetic data. It is not a verified dropout probability.</p>
+        <p>${Number(prediction.weeks_tracked || 0)} weekly records · Admission completeness: ${Math.round(Number(prediction.data_completeness || 0) * 100)}%</p>
+        <p>${escapeHtml(prediction.explanation_method || 'Explanations available after scoring')}</p>
+        <ul>${(prediction.explanations || []).map(e => `<li>${escapeHtml(e.feature)}: ${escapeHtml(String(e.value))}; score sensitivity ${Number(e.score_change_points).toFixed(1)} points compared with reference ${escapeHtml(String(e.reference))}</li>`).join('')}</ul>
+        <small>Model: ${escapeHtml(prediction.model_version || '—')} · ${escapeHtml(prediction.scored_at || '')}</small>`;
+    }
     if (attendanceEl) attendanceEl.innerHTML = trendChip(data.attendance_trend);
     if (marksEl) marksEl.innerHTML = trendChip(data.marks_trend);
     if (feeEl) feeEl.innerHTML = trendChip(data.fee_trend);
@@ -1949,7 +1993,8 @@ function getCurrentUser() {
 
 function enforceAuth() {
   const user = getCurrentUser();
-  if (!user) {
+  if (!user || user.source !== "backend" || !localStorage.getItem("eduguard_token")) {
+    localStorage.removeItem("eduguard_user");
     window.location.href = "login.html";
     return null;
   }
@@ -2093,45 +2138,20 @@ function toggleAIChat() {
   document.getElementById("aiChatPanel").classList.toggle("active", aiChatOpen);
 }
 
-const aiResponses = [
-  "Based on current data, <strong>5 new students</strong> have been flagged as high risk this week. The primary contributing factors are declining attendance and pending tuition fees.",
-  "I recommend immediate <strong>counseling intervention</strong> for Rahul Verma (Risk: 92). His attendance has dropped below 50% and he has outstanding financial dues.",
-  "The <strong>risk factor analysis</strong> shows that 62% of high-risk students have financial difficulties, followed by 54% with attendance issues. Combining interventions typically improves outcomes by 40%.",
-  "Student <strong>Priya Singh</strong> is showing escalating risk trends. Her score rose from 78 to 88 in the last 2 weeks. Family outreach has been suggested as an intervention.",
-  "The <strong>intervention success rate</strong> is currently at 67%. Students who receive counseling within 7 days of being flagged show 2.3x better outcomes.",
-  "I've analyzed the latest batch of data. <strong>Anita Desai</strong> needs immediate attention — she has 3 concurrent risk factors and no intervention assigned yet.",
-];
-
-let aiResponseIndex = 0;
-
-function sendAIMessage() {
-  const input = document.getElementById("aiChatInput");
-  const msg = input.value.trim();
-  if (!msg) return;
-
-  const body = document.getElementById("aiChatBody");
-
-  // User message
-  body.innerHTML += `<div class="chat-msg user">${escapeHtml(msg)}</div>`;
-  input.value = "";
-
-  // Typing indicator
-  body.innerHTML += `<div class="chat-msg ai" id="typing" style="opacity:0.6;">
-    <i class="fas fa-circle-notch fa-spin"></i> Analyzing...
-  </div>`;
+async function sendAIMessage() {
+  const input = document.getElementById('aiChatInput');
+  const message = input.value.trim();
+  if (!message) return;
+  const body = document.getElementById('aiChatBody');
+  body.innerHTML += `<div class="chat-msg user">${escapeHtml(message)}</div>`;
+  input.value = '';
+  try {
+    const data = await fetchAPI('/api/analytics/ai-chat', {method:'POST', body:JSON.stringify({message})});
+    body.innerHTML += `<div class="chat-msg ai">${escapeHtml(data.reply)}</div>`;
+  } catch (error) {
+    body.innerHTML += `<div class="chat-msg ai">Assistant unavailable: ${escapeHtml(error.message)}. Students can use Ask for Help to reach staff.</div>`;
+  }
   body.scrollTop = body.scrollHeight;
-
-  // AI response after delay
-  setTimeout(() => {
-    const typing = document.getElementById("typing");
-    if (typing) typing.remove();
-
-    const response = aiResponses[aiResponseIndex % aiResponses.length];
-    aiResponseIndex++;
-
-    body.innerHTML += `<div class="chat-msg ai">${response}</div>`;
-    body.scrollTop = body.scrollHeight;
-  }, 1200);
 }
 
 function escapeHtml(text) {
@@ -2153,6 +2173,7 @@ document.getElementById("sidebarClose")?.addEventListener("click", () => {
 // ===== CHARTS =====
 
 function initCharts() {
+  if (typeof Chart === "undefined") return;
   const compactYAxis = {
     ticks: {
       color: "#6B7280",
@@ -2202,10 +2223,10 @@ function initCharts() {
     studentAttendanceChart = new Chart(attCtx.getContext("2d"), {
       type: "line",
       data: {
-        labels: ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb"],
+        labels: [],
         datasets: [{
           label: "Attendance %",
-          data: [82, 75, 68, 60, 55, 50, 48],
+          data: [],
           borderColor: "#EF4444",
           backgroundColor: "rgba(239,68,68,0.08)",
           fill: true,
@@ -2230,10 +2251,10 @@ function initCharts() {
     studentMarksChart = new Chart(mkCtx.getContext("2d"), {
       type: "line",
       data: {
-        labels: ["IA-1", "IA-2", "IA-3", "Midterm", "IA-4", "IA-5"],
+        labels: [],
         datasets: [{
-          label: "Marks",
-          data: [65, 58, 48, 42, 38, 32],
+          label: "IA marks (out of 40)",
+          data: [],
           borderColor: "#EF4444",
           backgroundColor: "rgba(239,68,68,0.08)",
           fill: true,
@@ -2444,7 +2465,7 @@ function initCharts() {
 function animateRiskCircle() {
   const fill = document.getElementById("riskCircleFill");
   if (!fill) return;
-  const score = 78;
+  const score = Number(fill.dataset.score || 0);
   const circumference = 2 * Math.PI * 90; // r=90
   const offset = circumference - (score / 100) * circumference;
   setTimeout(() => {
@@ -2459,7 +2480,7 @@ let uploadCurrentType = "admission"; // "admission" or "weekly"
 let facultyWeeklyUploadFile = null;
 
 const ADMISSION_COLS = ["id", "name", "class_name", "semester", "Family_Income", "Scholarship", "Education_Loan", "Father_Occupation", "Mother_Occupation", "Parent_Education", "Home_Location", "HighSchool_Grade", "Admission_Quota"];
-const WEEKLY_COLS = ["Student_ID", "Week_Number", "Attendance_Percentage", "IA_Marks", "Semester_Marks", "Backlog_Count", "Fee_Outstanding"];
+const WEEKLY_COLS = ["Student_ID", "Week_Number", "Attendance_Percentage", "IA_Marks", "IA_Max", "Semester_Marks", "Backlog_Count", "Fee_Outstanding"];
 
 function initializeFacultyWeekDropdown() {
   const select = document.getElementById("facultyWeekSelect");
@@ -2520,9 +2541,10 @@ function buildWeeklyCsvForWeek(rows, selectedWeek) {
   const normalizedRows = rows.map(row => {
     const normalized = { ...row };
     if (!normalized.Student_ID && normalized.id) normalized.Student_ID = normalized.id;
-    normalized.Week_Number = String(selectedWeek);
+    if (normalized.Week_Number === undefined || normalized.Week_Number === "") normalized.Week_Number = String(selectedWeek);
+    if (normalized.IA_Max === undefined || normalized.IA_Max === "") normalized.IA_Max = "40";
     if (normalized.Fee_Outstanding === undefined || normalized.Fee_Outstanding === null || normalized.Fee_Outstanding === "") {
-      normalized.Fee_Outstanding = "No";
+      throw new Error("Fee_Outstanding is required; unknown is not the same as No.");
     }
     return normalized;
   });
@@ -2576,7 +2598,7 @@ async function submitFacultyWeeklyUpload() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("http://127.0.0.1:8000/api/upload/weekly", {
+    const res = await fetch(`${window.EDU_GUARD_API_URL || API_BASE_URL}/api/upload/weekly`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: formData,
@@ -2588,7 +2610,7 @@ async function submitFacultyWeeklyUpload() {
     }
 
     const result = await res.json();
-    alert(`Weekly upload complete: Created ${result.created}, Updated/Skipped ${result.skipped}, Errors ${result.errors?.length || 0}`);
+    alert(`Weekly upload complete: Created ${result.created}, Updated ${result.updated || 0}, Skipped ${result.skipped}, Errors ${result.errors?.length || 0}`);
     closeModal("uploadModal");
 
     const user = getCurrentUser();
@@ -2763,8 +2785,8 @@ async function submitUploadData() {
 
   // Pick endpoint based on current tab
   const endpoint = uploadCurrentType === "weekly"
-    ? "http://127.0.0.1:8000/api/upload/weekly"
-    : "http://127.0.0.1:8000/api/upload/admission";
+    ? `${window.EDU_GUARD_API_URL || API_BASE_URL}/api/upload/weekly`
+    : `${window.EDU_GUARD_API_URL || API_BASE_URL}/api/upload/admission`;
 
   try {
     const token = localStorage.getItem("eduguard_token");
@@ -2893,3 +2915,52 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   showPage(targetPage);
 });
+
+
+async function approveCopilotTicket(id) {
+  try {
+    await fetchAPI(`/api/copilot/tickets/${id}/approve`, {method: 'POST'});
+    await openCopilotRun(selectedCopilotRunId);
+    await fetchDashboardData(JSON.parse(localStorage.getItem("eduguard_user")));
+    renderInterventionsTable();
+  } catch (err) { alert(err.message); }
+}
+
+function openFollowUp(id) {
+  const item = interventions.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('followUpId').value = id;
+  document.getElementById('followUpStatus').value = item.status;
+  document.getElementById('followUpObservation').value = item.followUpObservation || '';
+  document.getElementById('followUpClosure').value = item.closureReason || '';
+  document.getElementById('followUpDue').value = item.dueAt ? item.dueAt.slice(0, 16) : '';
+  document.getElementById('followUpOwner').value = item.ownerId || '';
+  document.getElementById('followUpAttendance').value = '';
+  document.getElementById('followUpMarks').value = '';
+  document.getElementById('followUpError').textContent = '';
+  document.getElementById('followUpDialog').showModal();
+}
+
+async function saveFollowUp(event) {
+  event.preventDefault();
+  const id = Number(document.getElementById('followUpId').value);
+  const payload = {
+    status: document.getElementById('followUpStatus').value,
+    follow_up_observation: document.getElementById('followUpObservation').value,
+    closure_reason: document.getElementById('followUpClosure').value,
+  };
+  const due = document.getElementById('followUpDue').value;
+  const owner = document.getElementById('followUpOwner').value.trim();
+  if (due) payload.due_at = new Date(due).toISOString();
+  if (owner) payload.owner_id = owner;
+  for (const [field, element] of [['follow_up_attendance', 'followUpAttendance'], ['follow_up_marks', 'followUpMarks']]) {
+    const value = document.getElementById(element).value;
+    if (value !== '') payload[field] = Number(value);
+  }
+  try {
+    await fetchAPI(`/api/interventions/${id}`, {method: 'PUT', body: JSON.stringify(payload)});
+    document.getElementById('followUpDialog').close();
+    await fetchDashboardData(JSON.parse(localStorage.getItem("eduguard_user")));
+    renderInterventionsTable();
+  } catch (err) { document.getElementById('followUpError').textContent = err.message; }
+}
